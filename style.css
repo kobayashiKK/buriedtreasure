@@ -197,7 +197,10 @@ html, body {
   gap: 8px;
   overflow-y: auto;
   flex: 1 1 auto;
+  min-height: 0;
   padding: 2px;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .shop-item {
   display: flex;

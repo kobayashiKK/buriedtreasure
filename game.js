@@ -652,8 +652,11 @@
   el.btnEscape.addEventListener("click", escapeGame);
   el.btnContinue.addEventListener("click", continueDig);
 
-  // prevent gesture scroll/zoom
-  document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+  // prevent gesture scroll/zoom — but allow scrolling inside scroll areas (shop list)
+  document.addEventListener("touchmove", (e) => {
+    if (e.target.closest && e.target.closest(".scroll-area")) return;
+    e.preventDefault();
+  }, { passive: false });
   document.addEventListener("gesturestart", (e) => e.preventDefault());
   document.addEventListener("dblclick", (e) => e.preventDefault());
 
