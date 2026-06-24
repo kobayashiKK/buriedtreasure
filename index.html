@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1b120a" />
+<title>埋蔵金ディガー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- HUD -->
+    <header id="hud">
+      <div class="hud-item" id="hud-hp">
+        <span class="hud-label">HP</span>
+        <div class="bar"><div class="bar-fill" id="hp-bar"></div><span id="hp-text">30/30</span></div>
+      </div>
+      <div class="hud-item" id="hud-gold"><span class="hud-icon">💰</span><span id="gold-text">0</span></div>
+      <div class="hud-item" id="hud-depth"><span class="hud-icon">⛏️</span><span id="depth-text">B0F</span></div>
+    </header>
+
+    <!-- Game field -->
+    <main id="field-wrap">
+      <canvas id="game"></canvas>
+
+      <!-- Title overlay -->
+      <div class="overlay" id="ov-title">
+        <h1 class="title">埋蔵金<br><span class="title-accent">ディガー</span></h1>
+        <p class="subtitle">地の底へ。財宝とともに生きて還れ。</p>
+        <div class="best-score">最高記録: <span id="best-title">0</span> G</div>
+        <button class="btn btn-primary big" id="btn-start">ゲームスタート</button>
+        <div class="howto">
+          <p>下のパッドで穴を掘って進む。</p>
+          <p>💰財宝を集め、👹敵を倒し、🪜脱出ポイントで地上へ。</p>
+          <p>深く潜るほど敵は強く、稼ぎも大きい。</p>
+        </div>
+      </div>
+
+      <!-- Combat overlay -->
+      <div class="overlay overlay-panel" id="ov-combat" hidden>
+        <div class="enemy-box">
+          <div class="enemy-emoji" id="enemy-emoji">👹</div>
+          <div class="enemy-name" id="enemy-name">ゴブリン</div>
+          <div class="bar enemy-bar"><div class="bar-fill ehp" id="enemy-hp-bar"></div><span id="enemy-hp-text"></span></div>
+        </div>
+        <div class="combat-log" id="combat-log"></div>
+        <div class="combat-actions">
+          <button class="btn btn-attack" id="btn-attack">⚔️ こうげき</button>
+          <button class="btn btn-flee" id="btn-flee">💨 にげる</button>
+        </div>
+      </div>
+
+      <!-- Camp overlay -->
+      <div class="overlay overlay-panel" id="ov-camp" hidden>
+        <h2 class="camp-title">🪜 脱出ポイント</h2>
+        <p class="camp-sub" id="camp-sub">ここから地上へ脱出できる。装備を整えて更に潜ることも。</p>
+        <div class="shop" id="shop"></div>
+        <div class="camp-actions">
+          <button class="btn btn-escape" id="btn-escape">🪜 脱出する（クリア）</button>
+          <button class="btn btn-dig" id="btn-continue">⛏️ もっと潜る</button>
+        </div>
+      </div>
+
+      <!-- Result overlay -->
+      <div class="overlay" id="ov-result" hidden>
+        <h1 class="result-title" id="result-title">GAME OVER</h1>
+        <div class="result-emoji" id="result-emoji">💀</div>
+        <div class="result-score">
+          <div class="rs-row"><span>到達</span><span id="rs-depth">B0F</span></div>
+          <div class="rs-row big"><span>スコア</span><span id="rs-score">0 G</span></div>
+          <div class="rs-row"><span>最高記録</span><span id="rs-best">0 G</span></div>
+        </div>
+        <button class="btn btn-primary big" id="btn-retry">もう一度</button>
+      </div>
+    </main>
+
+    <!-- Controller -->
+    <footer id="controller">
+      <div class="pad">
+        <button class="dbtn dbtn-up" data-dir="up" aria-label="上">▲</button>
+        <button class="dbtn dbtn-left" data-dir="left" aria-label="左">◀</button>
+        <button class="dbtn dbtn-down" data-dir="down" aria-label="下に掘る">▼<small>掘る</small></button>
+        <button class="dbtn dbtn-right" data-dir="right" aria-label="右">▶</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
