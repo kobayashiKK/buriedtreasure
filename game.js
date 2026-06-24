@@ -380,7 +380,7 @@
       r, c, name: ed.name, emoji: ed.emoji,
       hp, maxHp: hp,
       atk: Math.max(2, Math.round((3 + depth * 1.15) * (0.85 + Math.random() * 0.3))),
-      reward: 14 + depth * 6 + ((Math.random() * (10 + depth * 3)) | 0),
+      reward: 30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0),
       busy: false,
     };
     state = "combat";
@@ -434,18 +434,24 @@
   }
 
   function winCombat() {
-    player.gold += combat.reward;
-    addFloater(combat.r, combat.c, "+" + combat.reward + "G", "#f6c453");
+    const reward = combat.reward;
+    player.gold += reward;
+    el.enemyHpBar.style.width = "0%";
+    el.enemyHpText.textContent = "0/" + combat.maxHp;
+    logCombat(`${combat.name} をたおした！ <span class="dmg">💰+${reward}G</span> を手に入れた！`);
+    addFloater(combat.r, combat.c, "+" + reward + "G", "#f6c453");
     setTile(combat.r, combat.c, "empty");
     delete enemyCache[combat.r + "," + combat.c];
-    show(el.ovCombat, false);
     updateHUD();
     sfx("coin");
     const tr = combat.r, tc = combat.c;
-    state = "explore";
-    combat = null;
-    // walk into the cleared tile
-    doMoveTo(tr, tc);
+    // keep the panel up briefly so the reward is clearly seen
+    setTimeout(() => {
+      show(el.ovCombat, false);
+      state = "explore";
+      combat = null;
+      doMoveTo(tr, tc);
+    }, 850);
   }
 
   function flee() {
