@@ -24,8 +24,8 @@
     ovCamp: $("ov-camp"), campSub: $("camp-sub"), shop: $("shop"),
     btnEscape: $("btn-escape"), btnContinue: $("btn-continue"),
     bankBanked: $("bank-banked"), bankCarry: $("bank-carry"), bankWdAvail: $("bank-wd-avail"),
-    depRange: $("dep-range"), depAmt: $("dep-amt"), btnDeposit: $("btn-deposit"),
-    wdRange: $("wd-range"), wdAmt: $("wd-amt"), btnWithdraw: $("btn-withdraw"),
+    depAmt: $("dep-amt"), btnDeposit: $("btn-deposit"),
+    wdAmt: $("wd-amt"), btnWithdraw: $("btn-withdraw"),
     ovResult: $("ov-result"), resultTitle: $("result-title"), resultEmoji: $("result-emoji"),
     rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"),
     rsLostRow: $("rs-lost-row"), rsLost: $("rs-lost"),
@@ -544,29 +544,60 @@
     sfx("heal");
   }
 
+  // Custom pointer-driven slider (native range inputs are unreliable on touch).
+  let depSlider = null, wdSlider = null;
+  function makeSlider(id, onChange) {
+    const root = $(id);
+    const fill = root.querySelector(".slider-fill");
+    const thumb = root.querySelector(".slider-thumb");
+    let max = 0, val = 0, dragging = false;
+    function update() {
+      const p = max > 0 ? val / max : 0;
+      fill.style.width = (p * 100) + "%";
+      thumb.style.left = (p * 100) + "%";
+      root.classList.toggle("disabled", max <= 0);
+      onChange && onChange(val);
+    }
+    function setFromX(clientX) {
+      const r = root.getBoundingClientRect();
+      let p = r.width > 0 ? (clientX - r.left) / r.width : 0;
+      p = Math.max(0, Math.min(1, p));
+      val = Math.round(p * max);
+      update();
+    }
+    root.addEventListener("pointerdown", (e) => {
+      if (max <= 0) return;
+      dragging = true;
+      try { root.setPointerCapture(e.pointerId); } catch (_) {}
+      setFromX(e.clientX);
+      e.preventDefault();
+    });
+    root.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      setFromX(e.clientX);
+      e.preventDefault();
+    });
+    const end = () => { dragging = false; };
+    root.addEventListener("pointerup", end);
+    root.addEventListener("pointercancel", end);
+    return {
+      setMax(m) { max = Math.max(0, m | 0); if (val > max) val = max; update(); },
+      setVal(v) { val = Math.max(0, Math.min(max, v | 0)); update(); },
+      getVal() { return val; },
+    };
+  }
+
   function renderBank() {
     el.bankBanked.textContent = player.banked;
     el.bankCarry.textContent = player.gold;
     el.bankWdAvail.textContent = player.withdrawable;
-    el.depRange.max = String(player.gold);
-    if ((parseInt(el.depRange.value, 10) || 0) > player.gold) el.depRange.value = String(player.gold);
-    el.wdRange.max = String(player.withdrawable); // 今回預けた分はロック
-    if ((parseInt(el.wdRange.value, 10) || 0) > player.withdrawable) el.wdRange.value = String(player.withdrawable);
-    updateBankLabels();
-  }
-
-  function updateBankLabels() {
-    const d = parseInt(el.depRange.value, 10) || 0;
-    const w = parseInt(el.wdRange.value, 10) || 0;
-    el.depAmt.textContent = d;
-    el.wdAmt.textContent = w;
-    el.btnDeposit.disabled = d <= 0;
-    el.btnWithdraw.disabled = w <= 0;
+    depSlider.setMax(player.gold);
+    wdSlider.setMax(player.withdrawable); // 今回預けた分はロック
   }
 
   // 預ける：手持ち→貯金。今回預けた分は withdrawable に加えない（次回まで引き出せない）
   function deposit() {
-    const amt = Math.min(player.gold, parseInt(el.depRange.value, 10) || 0);
+    const amt = Math.min(player.gold, depSlider.getVal());
     if (amt <= 0) return;
     player.gold -= amt;
     player.banked += amt;
@@ -575,7 +606,7 @@
 
   // 引き出す：繰り越し貯金(withdrawable)の範囲でのみ 貯金→手持ち
   function withdraw() {
-    const amt = Math.min(player.withdrawable, parseInt(el.wdRange.value, 10) || 0);
+    const amt = Math.min(player.withdrawable, wdSlider.getVal());
     if (amt <= 0) return;
     player.banked -= amt;
     player.gold += amt;
@@ -586,8 +617,8 @@
   function afterBankMove() {
     saveProfile();
     updateHUD();
-    el.depRange.value = "0";
-    el.wdRange.value = "0";
+    depSlider.setVal(0);
+    wdSlider.setVal(0);
     renderBank();
     renderShop(); // affordability changed
     sfx("coin");
@@ -807,8 +838,8 @@
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
   el.btnContinue.addEventListener("click", continueDig);
-  el.depRange.addEventListener("input", updateBankLabels);
-  el.wdRange.addEventListener("input", updateBankLabels);
+  depSlider = makeSlider("dep-slider", (v) => { el.depAmt.textContent = v; el.btnDeposit.disabled = v <= 0; });
+  wdSlider = makeSlider("wd-slider", (v) => { el.wdAmt.textContent = v; el.btnWithdraw.disabled = v <= 0; });
   el.btnDeposit.addEventListener("click", deposit);
   el.btnWithdraw.addEventListener("click", withdraw);
 

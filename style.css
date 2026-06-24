@@ -262,13 +262,38 @@ html, body {
 .bank-stat { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .bank-stat b { color: var(--accent); }
 .bank-line { display: flex; align-items: center; gap: 8px; }
-.bank-line input[type="range"] {
+.slider {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  height: 26px;
-  accent-color: #5fbf6f;
-  touch-action: none; /* スマホで横ドラッグを確実にスライダーへ */
+  height: 30px;
+  touch-action: none; /* ドラッグをスライダーが受け取る */
+  cursor: pointer;
 }
+.slider-track {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  height: 14px;
+  background: #1a1008;
+  border: 2px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.slider-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; }
+.slider.dep .slider-fill { background: linear-gradient(#5fbf6f, #3a8f4a); }
+.slider.wd .slider-fill { background: linear-gradient(var(--accent), var(--accent-2)); }
+.slider-thumb {
+  position: absolute;
+  top: 50%; left: 0;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #fdf3da;
+  border: 2px solid #5a3d22;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 4px rgba(0,0,0,.5);
+}
+.slider.disabled { opacity: .4; pointer-events: none; }
 .bank-btn {
   flex: 0 0 auto;
   font-size: 13px;
