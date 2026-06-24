@@ -15,7 +15,7 @@
 
   const el = {
     hpBar: $("hp-bar"), hpText: $("hp-text"),
-    gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"), bank: $("bank-text"),
+    gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"), armorIcon: $("armor-icon"), bank: $("bank-text"),
     ovTitle: $("ov-title"), bestTitle: $("best-title"), btnStart: $("btn-start"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
     enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
@@ -38,6 +38,22 @@
     { name: "ミスリルブレード", emoji: "🔱", power: 42, cost: 1500 },
     { name: "ドラゴンソード",  emoji: "🗡️", power: 64, cost: 3600 },
     { name: "エクスカリバー",  emoji: "⚜️", power: 98, cost: 8500 },
+    { name: "ホーリーランス",   emoji: "🔆", power: 140, cost: 18000 },
+    { name: "ゴッドアクス",     emoji: "⚡", power: 195, cost: 38000 },
+    { name: "天空の剣",        emoji: "🌟", power: 270, cost: 80000 },
+  ];
+
+  // ---- Armor (ダメージ軽減) ----
+  const ARMOR = [
+    { name: "はだ着",         emoji: "👕", def: 0,  cost: 0 },
+    { name: "革のよろい",     emoji: "🧥", def: 2,  cost: 70 },
+    { name: "鎖かたびら",     emoji: "⛓️", def: 4,  cost: 200 },
+    { name: "鉄のよろい",     emoji: "🛡️", def: 7,  cost: 480 },
+    { name: "ハガネのよろい", emoji: "🪖", def: 11, cost: 1100 },
+    { name: "ミスリルメイル", emoji: "🦺", def: 16, cost: 2600 },
+    { name: "竜鱗のよろい",   emoji: "🐲", def: 23, cost: 6000 },
+    { name: "神々のよろい",   emoji: "✨", def: 32, cost: 14000 },
+    { name: "聖なる法衣",     emoji: "🥋", def: 44, cost: 32000 },
   ];
 
   // ---- Enemy pools by depth tier (やさしい見た目のマイルドな魔物) ----
@@ -76,7 +92,8 @@
   let shakeT = 0;
 
   function freshPlayer() {
-    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30, gold: 0, banked: 0, weapon: 0, depthMax: 0, owned: [true] };
+    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30, gold: 0, banked: 0,
+             weapon: 0, owned: [true], armor: 0, ownedArmor: [true], depthMax: 0 };
   }
 
   // ============================================================
@@ -426,10 +443,13 @@
   }
 
   function enemyAttack(done) {
-    const dmg = Math.max(1, Math.round(combat.atk * (0.8 + Math.random() * 0.4)));
+    const raw = Math.max(1, Math.round(combat.atk * (0.8 + Math.random() * 0.4)));
+    const def = ARMOR[player.armor].def;
+    const dmg = Math.max(1, raw - def);
     player.hp -= dmg;
     shakeT = 0.6;
-    logCombat(`${combat.name} の こうげき！ <span class="hurt">${dmg}</span> ダメージをうけた`);
+    const reduced = def > 0 && raw > dmg ? `（${ARMOR[player.armor].name}で-${raw - dmg}）` : "";
+    logCombat(`${combat.name} の こうげき！ <span class="hurt">${dmg}</span> ダメージ${reduced}`);
     updateHUD();
     sfx("hurt");
     if (player.hp <= 0) { player.hp = 0; updateHUD(); setTimeout(gameOver, 500); return; }
@@ -528,7 +548,8 @@
 
   function renderShop() {
     el.shop.innerHTML = "";
-    // Heal option
+    // --- restock ---
+    el.shop.appendChild(shopHeader("🛏️ 休息"));
     if (player.hp < player.maxHp) {
       const healCost = Math.max(10, (player.maxHp - player.hp) * 4);
       el.shop.appendChild(shopRow("💊", "HP全回復", `HPを ${player.maxHp} まで回復`, healCost,
@@ -537,36 +558,61 @@
           updateHUD(); renderBank(); renderShop();
         }));
     }
-    // Max HP up
     const hpUpCost = 60 + player.maxHp * 5;
-    el.shop.appendChild(shopRow("🛡️", "最大HPアップ", `最大HP +10（現在 ${player.maxHp}）`, hpUpCost,
+    el.shop.appendChild(shopRow("💗", "最大HPアップ", `最大HP +10（現在 ${player.maxHp}）`, hpUpCost,
       player.gold >= hpUpCost, false, () => {
         player.gold -= hpUpCost; player.maxHp += 10; player.hp += 10;
         updateHUD(); renderBank(); renderShop();
       }));
-    // Weapons
-    WEAPONS.forEach((w, i) => {
-      if (i === 0) return;
-      const owned = player.owned[i];
-      const equipped = player.weapon === i;
-      const desc = `攻撃力 ${w.power}` + (i > player.weapon ? "" : "");
-      const row = shopRow(w.emoji, w.name, desc, w.cost,
-        !owned && player.gold >= w.cost, owned, () => {
-          if (player.owned[i]) return;
-          player.gold -= w.cost; player.owned[i] = true; player.weapon = i;
+
+    // --- weapons ---
+    el.shop.appendChild(shopHeader("⚔️ 武器（攻撃力アップ）"));
+    equipSection(WEAPONS,
+      (i) => player.owned[i], () => player.weapon,
+      (i) => { player.owned[i] = true; player.weapon = i; },
+      (i) => { player.weapon = i; },
+      (w) => `攻撃力 ${w.power}`);
+
+    // --- armor ---
+    el.shop.appendChild(shopHeader("🛡️ 防具（被ダメージ軽減）"));
+    equipSection(ARMOR,
+      (i) => player.ownedArmor[i], () => player.armor,
+      (i) => { player.ownedArmor[i] = true; player.armor = i; },
+      (i) => { player.armor = i; },
+      (a) => `防御力 ${a.def}`);
+  }
+
+  // Generic weapon/armor list renderer
+  function equipSection(list, isOwned, getEquipped, buyEquip, justEquip, descFn) {
+    list.forEach((it, i) => {
+      if (i === 0) return; // index 0 = starting gear, not for sale
+      const owned = isOwned(i);
+      const equipped = getEquipped() === i;
+      const row = shopRow(it.emoji, it.name, descFn(it), it.cost,
+        !owned && player.gold >= it.cost, owned, () => {
+          if (isOwned(i)) return;
+          player.gold -= it.cost; buyEquip(i);
           updateHUD(); renderBank(); renderShop();
         });
       if (owned) {
-        row.classList.add("owned");
         const buy = row.querySelector(".si-buy");
-        if (equipped) { buy.textContent = "装備中"; buy.classList.add("equipped"); buy.disabled = true; }
-        else {
-          buy.textContent = "装備する"; buy.disabled = false; row.classList.remove("owned");
-          buy.onclick = () => { player.weapon = i; updateHUD(); renderShop(); };
+        if (equipped) {
+          row.classList.add("owned");
+          buy.textContent = "装備中"; buy.classList.add("equipped"); buy.disabled = true;
+        } else {
+          buy.textContent = "装備する"; buy.disabled = false;
+          buy.onclick = () => { justEquip(i); updateHUD(); renderShop(); };
         }
       }
       el.shop.appendChild(row);
     });
+  }
+
+  function shopHeader(text) {
+    const d = document.createElement("div");
+    d.className = "shop-head";
+    d.textContent = text;
+    return d;
   }
 
   function shopRow(icon, name, desc, cost, canBuy, owned, onBuy) {
@@ -647,6 +693,7 @@
     el.bank.textContent = player.banked;
     el.depth.textContent = "B" + player.r + "F";
     el.weaponIcon.textContent = WEAPONS[player.weapon].emoji;
+    el.armorIcon.textContent = ARMOR[player.armor].emoji;
   }
 
   // ============================================================
