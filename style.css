@@ -119,6 +119,9 @@ html, body {
   justify-content: flex-start;
   padding-top: 18px;
   background: rgba(12, 7, 3, 0.94);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .title {
@@ -195,12 +198,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   padding: 2px;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
 }
 .shop-item {
   display: flex;
