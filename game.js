@@ -24,8 +24,6 @@
     ovCamp: $("ov-camp"), campSub: $("camp-sub"), shop: $("shop"),
     btnEscape: $("btn-escape"), btnContinue: $("btn-continue"),
     bankBanked: $("bank-banked"), bankCarry: $("bank-carry"),
-    depRange: $("dep-range"), depAmt: $("dep-amt"), btnDeposit: $("btn-deposit"),
-    wdRange: $("wd-range"), wdAmt: $("wd-amt"), btnWithdraw: $("btn-withdraw"),
     ovResult: $("ov-result"), resultTitle: $("result-title"), resultEmoji: $("result-emoji"),
     rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"),
     rsLostRow: $("rs-lost-row"), rsLost: $("rs-lost"),
@@ -546,45 +544,19 @@
   function renderBank() {
     el.bankBanked.textContent = player.banked;
     el.bankCarry.textContent = player.gold;
-    el.depRange.max = String(player.gold);
-    if ((parseInt(el.depRange.value, 10) || 0) > player.gold) el.depRange.value = String(player.gold);
-    el.wdRange.max = String(player.banked);
-    if ((parseInt(el.wdRange.value, 10) || 0) > player.banked) el.wdRange.value = String(player.banked);
-    updateBankLabels();
+    document.querySelectorAll('.bank-q[data-act="dep"]').forEach((b) => { b.disabled = player.gold <= 0; });
+    document.querySelectorAll('.bank-q[data-act="wd"]').forEach((b) => { b.disabled = player.banked <= 0; });
   }
 
-  function updateBankLabels() {
-    const d = parseInt(el.depRange.value, 10) || 0;
-    const w = parseInt(el.wdRange.value, 10) || 0;
-    el.depAmt.textContent = d;
-    el.wdAmt.textContent = w;
-    el.btnDeposit.disabled = d <= 0;
-    el.btnWithdraw.disabled = w <= 0;
-  }
-
-  // 預ける：手持ち→貯金（次回へ持ち越せる安全な金）
-  function deposit() {
-    const amt = Math.min(player.gold, parseInt(el.depRange.value, 10) || 0);
+  // act: "dep" (手持ち→貯金) or "wd" (貯金→手持ち). amt: number or "all".
+  function doBank(act, amtRaw) {
+    const src = act === "dep" ? player.gold : player.banked;
+    let amt = amtRaw === "all" ? src : Math.min(src, parseInt(amtRaw, 10) || 0);
     if (amt <= 0) return;
-    player.gold -= amt;
-    player.banked += amt;
-    afterBankMove();
-  }
-
-  // 引き出す：貯金→手持ち（装備購入に使えるが、負けると失う）
-  function withdraw() {
-    const amt = Math.min(player.banked, parseInt(el.wdRange.value, 10) || 0);
-    if (amt <= 0) return;
-    player.banked -= amt;
-    player.gold += amt;
-    afterBankMove();
-  }
-
-  function afterBankMove() {
+    if (act === "dep") { player.gold -= amt; player.banked += amt; }
+    else { player.banked -= amt; player.gold += amt; }
     saveProfile();
     updateHUD();
-    el.depRange.value = "0";
-    el.wdRange.value = "0";
     renderBank();
     renderShop(); // affordability changed
     sfx("coin");
@@ -804,10 +776,9 @@
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
   el.btnContinue.addEventListener("click", continueDig);
-  el.depRange.addEventListener("input", updateBankLabels);
-  el.wdRange.addEventListener("input", updateBankLabels);
-  el.btnDeposit.addEventListener("click", deposit);
-  el.btnWithdraw.addEventListener("click", withdraw);
+  document.querySelectorAll(".bank-q").forEach((b) => {
+    b.addEventListener("click", () => doBank(b.dataset.act, b.dataset.amt));
+  });
 
   // prevent gesture scroll/zoom — but allow scrolling inside scroll areas (shop list)
   document.addEventListener("touchmove", (e) => {

@@ -66,12 +66,16 @@
           <div class="bank-head">🏦 金庫：引き出した分は負けると失う／残した分は次回へ持ち越し</div>
           <div class="bank-stat"><span>貯金 <b id="bank-banked">0</b>G</span><span>手持ち <b id="bank-carry">0</b>G</span></div>
           <div class="bank-line">
-            <input type="range" id="dep-range" min="0" max="0" value="0" />
-            <button class="btn bank-btn dep" id="btn-deposit">預ける <span id="dep-amt">0</span>G</button>
+            <span class="bank-act-label dep">預ける</span>
+            <button class="btn bank-q dep" data-act="dep" data-amt="100">+100</button>
+            <button class="btn bank-q dep" data-act="dep" data-amt="1000">+1000</button>
+            <button class="btn bank-q dep" data-act="dep" data-amt="all">全額</button>
           </div>
           <div class="bank-line">
-            <input type="range" id="wd-range" min="0" max="0" value="0" />
-            <button class="btn bank-btn wd" id="btn-withdraw">引き出す <span id="wd-amt">0</span>G</button>
+            <span class="bank-act-label wd">引き出す</span>
+            <button class="btn bank-q wd" data-act="wd" data-amt="100">+100</button>
+            <button class="btn bank-q wd" data-act="wd" data-amt="1000">+1000</button>
+            <button class="btn bank-q wd" data-act="wd" data-amt="all">全額</button>
           </div>
         </div>
         <div class="shop scroll-area" id="shop"></div>

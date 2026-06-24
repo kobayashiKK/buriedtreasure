@@ -261,21 +261,20 @@ html, body {
 .bank-head { font-size: 11px; color: #8fd09a; }
 .bank-stat { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .bank-stat b { color: var(--accent); }
-.bank-line { display: flex; align-items: center; gap: 8px; }
-.bank-line input[type="range"] { flex: 1 1 auto; min-width: 0; height: 22px; }
-.bank-btn {
-  flex: 0 0 auto;
+.bank-line { display: flex; align-items: center; gap: 6px; }
+.bank-act-label { flex: 0 0 64px; font-size: 13px; }
+.bank-act-label.dep { color: #8fd09a; }
+.bank-act-label.wd { color: var(--accent); }
+.bank-q {
+  flex: 1 1 0;
   font-size: 13px;
-  padding: 8px 10px;
-  white-space: nowrap;
+  padding: 9px 4px;
   border-width: 2px;
-  min-width: 104px;
   text-align: center;
 }
-.bank-btn.dep { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; accent-color: #5fbf6f; }
-.bank-btn.wd { background: linear-gradient(var(--accent), var(--accent-2)); color: #2a1606; border-color: #8a5a1c; }
-.bank-line input[type="range"] { accent-color: #5fbf6f; }
-.bank-btn:disabled { background: #3a2818 !important; color: #6b5a42 !important; border-color: #4a3422 !important; }
+.bank-q.dep { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; }
+.bank-q.wd { background: linear-gradient(var(--accent), var(--accent-2)); color: #2a1606; border-color: #8a5a1c; }
+.bank-q:disabled { background: #3a2818 !important; color: #6b5a42 !important; border-color: #4a3422 !important; }
 .lost { color: var(--danger) !important; }
 
 .camp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px; margin-top: 8px; }
