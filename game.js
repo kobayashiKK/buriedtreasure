@@ -23,8 +23,9 @@
     btnAttack: $("btn-attack"), btnFlee: $("btn-flee"),
     ovCamp: $("ov-camp"), campSub: $("camp-sub"), shop: $("shop"),
     btnEscape: $("btn-escape"), btnContinue: $("btn-continue"),
-    bankBanked: $("bank-banked"), bankCarry: $("bank-carry"), bankRange: $("bank-range"),
-    bankAmountLabel: $("bank-amount-label"), btnSend: $("btn-send"),
+    bankBanked: $("bank-banked"), bankCarry: $("bank-carry"),
+    depRange: $("dep-range"), depAmt: $("dep-amt"), btnDeposit: $("btn-deposit"),
+    wdRange: $("wd-range"), wdAmt: $("wd-amt"), btnWithdraw: $("btn-withdraw"),
     ovResult: $("ov-result"), resultTitle: $("result-title"), resultEmoji: $("result-emoji"),
     rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"),
     rsLostRow: $("rs-lost-row"), rsLost: $("rs-lost"),
@@ -535,7 +536,7 @@
   // ============================================================
   function openCamp() {
     state = "camp";
-    el.campSub.textContent = `B${player.r}F の脱出ポイント。送金して稼ぎを確保しよう。`;
+    el.campSub.textContent = `B${player.r}F の脱出ポイント。預けて確保、引き出して装備購入。`;
     renderBank();
     renderShop();
     show(el.ovCamp, true);
@@ -545,38 +546,53 @@
   function renderBank() {
     el.bankBanked.textContent = player.banked;
     el.bankCarry.textContent = player.gold;
-    const max = player.gold;
-    el.bankRange.max = String(max);
-    // default to sending everything you still carry
-    el.bankRange.value = String(max);
-    updateBankLabel();
+    el.depRange.max = String(player.gold);
+    if ((parseInt(el.depRange.value, 10) || 0) > player.gold) el.depRange.value = String(player.gold);
+    el.wdRange.max = String(player.banked);
+    if ((parseInt(el.wdRange.value, 10) || 0) > player.banked) el.wdRange.value = String(player.banked);
+    updateBankLabels();
   }
 
-  function updateBankLabel() {
-    const amt = parseInt(el.bankRange.value, 10) || 0;
-    el.bankAmountLabel.textContent = amt + " G おくる";
-    el.btnSend.disabled = amt <= 0;
+  function updateBankLabels() {
+    const d = parseInt(el.depRange.value, 10) || 0;
+    const w = parseInt(el.wdRange.value, 10) || 0;
+    el.depAmt.textContent = d;
+    el.wdAmt.textContent = w;
+    el.btnDeposit.disabled = d <= 0;
+    el.btnWithdraw.disabled = w <= 0;
   }
 
-  function sendToBank() {
-    const amt = Math.min(player.gold, parseInt(el.bankRange.value, 10) || 0);
+  // 預ける：手持ち→貯金（次回へ持ち越せる安全な金）
+  function deposit() {
+    const amt = Math.min(player.gold, parseInt(el.depRange.value, 10) || 0);
     if (amt <= 0) return;
     player.gold -= amt;
     player.banked += amt;
+    afterBankMove();
+  }
+
+  // 引き出す：貯金→手持ち（装備購入に使えるが、負けると失う）
+  function withdraw() {
+    const amt = Math.min(player.banked, parseInt(el.wdRange.value, 10) || 0);
+    if (amt <= 0) return;
+    player.banked -= amt;
+    player.gold += amt;
+    afterBankMove();
+  }
+
+  function afterBankMove() {
     saveProfile();
     updateHUD();
+    el.depRange.value = "0";
+    el.wdRange.value = "0";
     renderBank();
     renderShop(); // affordability changed
     sfx("coin");
   }
 
-  // Purchases are paid from 手持ち first, then 貯金 (carried-over savings).
-  function canAfford(cost) { return player.gold + player.banked >= cost; }
-  function pay(cost) {
-    const fromGold = Math.min(player.gold, cost);
-    player.gold -= fromGold;
-    player.banked -= (cost - fromGold);
-  }
+  // Purchases are paid from 手持ち only. 貯金 must be withdrawn first to spend it.
+  function canAfford(cost) { return player.gold >= cost; }
+  function pay(cost) { player.gold -= cost; }
   function afterPurchase() {
     saveProfile();
     updateHUD();
@@ -788,8 +804,10 @@
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
   el.btnContinue.addEventListener("click", continueDig);
-  el.bankRange.addEventListener("input", updateBankLabel);
-  el.btnSend.addEventListener("click", sendToBank);
+  el.depRange.addEventListener("input", updateBankLabels);
+  el.wdRange.addEventListener("input", updateBankLabels);
+  el.btnDeposit.addEventListener("click", deposit);
+  el.btnWithdraw.addEventListener("click", withdraw);
 
   // prevent gesture scroll/zoom — but allow scrolling inside scroll areas (shop list)
   document.addEventListener("touchmove", (e) => {

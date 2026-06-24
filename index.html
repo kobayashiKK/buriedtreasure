@@ -39,7 +39,7 @@
         <div class="howto">
           <p>下のパッドで穴を掘って進む。</p>
           <p>💰財宝を集め、敵を倒し、🪜脱出ポイントで地上へ。</p>
-          <p>🏦送金・脱出で得たお金は次のゲームへ持ち越せる（装備は持ち越さない）。</p>
+          <p>🏦金庫に預けた／脱出で持ち帰ったお金は次のゲームへ持ち越し。引き出した分は負けると失う。</p>
           <p>深く潜るほど敵は強く、稼ぎも大きい。</p>
         </div>
       </div>
@@ -63,12 +63,15 @@
         <h2 class="camp-title">🪜 脱出ポイント</h2>
         <p class="camp-sub" id="camp-sub">ここから地上へ脱出できる。装備を整えて更に潜ることも。</p>
         <div class="bank" id="bank">
-          <div class="bank-head">🏦 地上へ送金（死んでも記録に残る）</div>
+          <div class="bank-head">🏦 金庫：引き出した分は負けると失う／残した分は次回へ持ち越し</div>
           <div class="bank-stat"><span>貯金 <b id="bank-banked">0</b>G</span><span>手持ち <b id="bank-carry">0</b>G</span></div>
-          <input type="range" id="bank-range" min="0" max="0" value="0" />
-          <div class="bank-row">
-            <span id="bank-amount-label">0 G おくる</span>
-            <button class="btn si-buy" id="btn-send">送金する</button>
+          <div class="bank-line">
+            <input type="range" id="dep-range" min="0" max="0" value="0" />
+            <button class="btn bank-btn dep" id="btn-deposit">預ける <span id="dep-amt">0</span>G</button>
+          </div>
+          <div class="bank-line">
+            <input type="range" id="wd-range" min="0" max="0" value="0" />
+            <button class="btn bank-btn wd" id="btn-withdraw">引き出す <span id="wd-amt">0</span>G</button>
           </div>
         </div>
         <div class="shop scroll-area" id="shop"></div>

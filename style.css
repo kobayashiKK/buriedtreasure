@@ -258,14 +258,24 @@ html, body {
   gap: 7px;
   text-align: left;
 }
-.bank-head { font-size: 13px; color: #8fd09a; }
+.bank-head { font-size: 11px; color: #8fd09a; }
 .bank-stat { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 .bank-stat b { color: var(--accent); }
-#bank-range { width: 100%; accent-color: #5fbf6f; height: 22px; }
-.bank-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-#bank-amount-label { font-size: 14px; color: var(--text); }
-#btn-send { flex: 0 0 auto; background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; }
-#btn-send:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
+.bank-line { display: flex; align-items: center; gap: 8px; }
+.bank-line input[type="range"] { flex: 1 1 auto; min-width: 0; height: 22px; }
+.bank-btn {
+  flex: 0 0 auto;
+  font-size: 13px;
+  padding: 8px 10px;
+  white-space: nowrap;
+  border-width: 2px;
+  min-width: 104px;
+  text-align: center;
+}
+.bank-btn.dep { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; accent-color: #5fbf6f; }
+.bank-btn.wd { background: linear-gradient(var(--accent), var(--accent-2)); color: #2a1606; border-color: #8a5a1c; }
+.bank-line input[type="range"] { accent-color: #5fbf6f; }
+.bank-btn:disabled { background: #3a2818 !important; color: #6b5a42 !important; border-color: #4a3422 !important; }
 .lost { color: var(--danger) !important; }
 
 .camp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px; margin-top: 8px; }
