@@ -33,12 +33,13 @@
       <div class="overlay" id="ov-title">
         <h1 class="title">埋蔵金<br><span class="title-accent">ディガー</span></h1>
         <p class="subtitle">地の底へ。財宝とともに生きて還れ。</p>
-        <div class="best-score">最高記録: <span id="best-title">0</span> G</div>
+        <div class="best-score">🏦 貯金 <span id="best-title">0</span> G ・ 最高到達 <span id="deepest-title">B0F</span></div>
         <button class="btn btn-primary big" id="btn-start">ゲームスタート</button>
+        <button class="btn btn-reset" id="btn-reset">最初からやり直す（貯金・装備リセット）</button>
         <div class="howto">
           <p>下のパッドで穴を掘って進む。</p>
           <p>💰財宝を集め、敵を倒し、🪜脱出ポイントで地上へ。</p>
-          <p>🏦脱出ポイントで送金した分は、死んでも記録に残る。</p>
+          <p>🏦送金・脱出で得たお金は次のゲームへ持ち越せる（装備は持ち越さない）。</p>
           <p>深く潜るほど敵は強く、稼ぎも大きい。</p>
         </div>
       </div>
@@ -84,8 +85,8 @@
         <div class="result-score">
           <div class="rs-row"><span>到達</span><span id="rs-depth">B0F</span></div>
           <div class="rs-row" id="rs-lost-row" hidden><span>失った手持ち</span><span id="rs-lost" class="lost">0 G</span></div>
-          <div class="rs-row big"><span>スコア（貯金）</span><span id="rs-score">0 G</span></div>
-          <div class="rs-row"><span>最高記録</span><span id="rs-best">0 G</span></div>
+          <div class="rs-row big"><span>貯金（次回へ持ち越し）</span><span id="rs-score">0 G</span></div>
+          <div class="rs-row"><span>最高到達</span><span id="rs-best">B0F</span></div>
         </div>
         <button class="btn btn-primary big" id="btn-retry">もう一度</button>
       </div>

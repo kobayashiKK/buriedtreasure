@@ -6,7 +6,7 @@
 
   const COLS = 7;
   const CAMP_INTERVAL = 8; // 脱出ポイント every N floors
-  const BEST_KEY = "buriedtreasure_best";
+  const SAVE_KEY = "buriedtreasure_save";
 
   // ---- DOM ----
   const $ = (id) => document.getElementById(id);
@@ -16,7 +16,8 @@
   const el = {
     hpBar: $("hp-bar"), hpText: $("hp-text"),
     gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"), armorIcon: $("armor-icon"), bank: $("bank-text"),
-    ovTitle: $("ov-title"), bestTitle: $("best-title"), btnStart: $("btn-start"),
+    ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"),
+    btnStart: $("btn-start"), btnReset: $("btn-reset"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
     enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
     btnAttack: $("btn-attack"), btnFlee: $("btn-flee"),
@@ -83,7 +84,26 @@
   let combat = null;
   let campOpenedAt = -1;
   let pendingMove = null;
-  let best = parseInt(localStorage.getItem(BEST_KEY) || "0", 10) || 0;
+  let profile = loadProfile();
+
+  // ---- persistent profile: only money (貯金) carries over, not equipment ----
+  function defaultProfile() {
+    return { bank: 0, deepest: 0 };
+  }
+  function loadProfile() {
+    try {
+      const p = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (!p || typeof p !== "object") return defaultProfile();
+      return { bank: p.bank | 0, deepest: p.deepest | 0 };
+    } catch (_) { return defaultProfile(); }
+  }
+  function saveProfile() {
+    profile = {
+      bank: player.banked,
+      deepest: Math.max(profile.deepest | 0, player.depthMax | 0),
+    };
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch (_) {}
+  }
 
   // animation
   let anim = { fromR: 0, fromC: 0, t: 1, dur: 0.13 };
@@ -91,9 +111,12 @@
   let floaters = []; // {r,c,text,color,t}
   let shakeT = 0;
 
+  // Each run starts with base equipment; only 貯金 (bank) carries over.
   function freshPlayer() {
-    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30, gold: 0, banked: 0,
-             weapon: 0, owned: [true], armor: 0, ownedArmor: [true], depthMax: 0 };
+    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30,
+             gold: 0, banked: profile.bank,
+             weapon: 0, owned: [true],
+             armor: 0, ownedArmor: [true], depthMax: 0 };
   }
 
   // ============================================================
@@ -540,10 +563,25 @@
     if (amt <= 0) return;
     player.gold -= amt;
     player.banked += amt;
+    saveProfile();
     updateHUD();
     renderBank();
     renderShop(); // affordability changed
     sfx("coin");
+  }
+
+  // Purchases are paid from 手持ち first, then 貯金 (carried-over savings).
+  function canAfford(cost) { return player.gold + player.banked >= cost; }
+  function pay(cost) {
+    const fromGold = Math.min(player.gold, cost);
+    player.gold -= fromGold;
+    player.banked -= (cost - fromGold);
+  }
+  function afterPurchase() {
+    saveProfile();
+    updateHUD();
+    renderBank();
+    renderShop();
   }
 
   function renderShop() {
@@ -553,16 +591,14 @@
     if (player.hp < player.maxHp) {
       const healCost = Math.max(10, (player.maxHp - player.hp) * 4);
       el.shop.appendChild(shopRow("💊", "HP全回復", `HPを ${player.maxHp} まで回復`, healCost,
-        player.gold >= healCost, false, () => {
-          player.gold -= healCost; player.hp = player.maxHp;
-          updateHUD(); renderBank(); renderShop();
+        canAfford(healCost), false, () => {
+          pay(healCost); player.hp = player.maxHp; afterPurchase();
         }));
     }
     const hpUpCost = 60 + player.maxHp * 5;
     el.shop.appendChild(shopRow("💗", "最大HPアップ", `最大HP +10（現在 ${player.maxHp}）`, hpUpCost,
-      player.gold >= hpUpCost, false, () => {
-        player.gold -= hpUpCost; player.maxHp += 10; player.hp += 10;
-        updateHUD(); renderBank(); renderShop();
+      canAfford(hpUpCost), false, () => {
+        pay(hpUpCost); player.maxHp += 10; player.hp += 10; afterPurchase();
       }));
 
     // --- weapons ---
@@ -589,10 +625,9 @@
       const owned = isOwned(i);
       const equipped = getEquipped() === i;
       const row = shopRow(it.emoji, it.name, descFn(it), it.cost,
-        !owned && player.gold >= it.cost, owned, () => {
+        !owned && canAfford(it.cost), owned, () => {
           if (isOwned(i)) return;
-          player.gold -= it.cost; buyEquip(i);
-          updateHUD(); renderBank(); renderShop();
+          pay(it.cost); buyEquip(i); afterPurchase();
         });
       if (owned) {
         const buy = row.querySelector(".si-buy");
@@ -601,7 +636,7 @@
           buy.textContent = "装備中"; buy.classList.add("equipped"); buy.disabled = true;
         } else {
           buy.textContent = "装備する"; buy.disabled = false;
-          buy.onclick = () => { justEquip(i); updateHUD(); renderShop(); };
+          buy.onclick = () => { justEquip(i); saveProfile(); updateHUD(); renderShop(); };
         }
       }
       el.shop.appendChild(row);
@@ -657,12 +692,9 @@
       lost = player.gold;
       player.gold = 0;
     }
-    const score = player.banked;
-    if (score > best) {
-      best = score;
-      localStorage.setItem(BEST_KEY, String(best));
-    }
-    el.resultTitle.textContent = cleared ? "脱出成功！" : "GAME OVER";
+    // 貯金・装備・最高到達を保存して次回へ持ち越し
+    saveProfile();
+    el.resultTitle.textContent = cleared ? "脱出成功！" : "ちからつきた…";
     el.resultTitle.classList.toggle("clear", cleared);
     el.resultEmoji.textContent = cleared ? "🎉" : "💀";
     el.rsDepth.textContent = "B" + player.depthMax + "F";
@@ -672,8 +704,8 @@
     } else {
       show(el.rsLostRow, false);
     }
-    el.rsScore.textContent = score + " G";
-    el.rsBest.textContent = best + " G";
+    el.rsScore.textContent = player.banked + " G";
+    el.rsBest.textContent = "B" + profile.deepest + "F";
     updateHUD();
     show(el.ovResult, true);
     sfx(cleared ? "win" : "lose");
@@ -744,6 +776,14 @@
 
   el.btnStart.addEventListener("click", startGame);
   el.btnRetry.addEventListener("click", startGame);
+  el.btnReset.addEventListener("click", () => {
+    if (!confirm("貯金と記録をすべて消してリセットしますか？")) return;
+    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+    profile = defaultProfile();
+    player = freshPlayer();
+    updateTitle();
+    updateHUD();
+  });
   el.btnAttack.addEventListener("click", playerAttack);
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
@@ -794,7 +834,11 @@
   // ============================================================
   //  Boot
   // ============================================================
-  el.bestTitle && (el.bestTitle.textContent = best);
+  function updateTitle() {
+    el.bestTitle.textContent = profile.bank;
+    el.deepestTitle.textContent = "B" + profile.deepest + "F";
+  }
+  updateTitle();
   player = freshPlayer();
   ensureRow(0);
   resize();
