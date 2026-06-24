@@ -15,7 +15,7 @@
 
   const el = {
     hpBar: $("hp-bar"), hpText: $("hp-text"),
-    gold: $("gold-text"), depth: $("depth-text"),
+    gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"),
     ovTitle: $("ov-title"), bestTitle: $("best-title"), btnStart: $("btn-start"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
     enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
@@ -597,6 +597,7 @@
     el.hpText.textContent = player.hp + "/" + player.maxHp;
     el.gold.textContent = player.gold;
     el.depth.textContent = "B" + player.r + "F";
+    el.weaponIcon.textContent = WEAPONS[player.weapon].emoji;
   }
 
   // ============================================================
