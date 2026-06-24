@@ -15,15 +15,18 @@
 
   const el = {
     hpBar: $("hp-bar"), hpText: $("hp-text"),
-    gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"),
+    gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"), bank: $("bank-text"),
     ovTitle: $("ov-title"), bestTitle: $("best-title"), btnStart: $("btn-start"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
     enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
     btnAttack: $("btn-attack"), btnFlee: $("btn-flee"),
     ovCamp: $("ov-camp"), campSub: $("camp-sub"), shop: $("shop"),
     btnEscape: $("btn-escape"), btnContinue: $("btn-continue"),
+    bankBanked: $("bank-banked"), bankCarry: $("bank-carry"), bankRange: $("bank-range"),
+    bankAmountLabel: $("bank-amount-label"), btnSend: $("btn-send"),
     ovResult: $("ov-result"), resultTitle: $("result-title"), resultEmoji: $("result-emoji"),
     rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"),
+    rsLostRow: $("rs-lost-row"), rsLost: $("rs-lost"),
   };
 
   // ---- Weapons ----
@@ -73,7 +76,7 @@
   let shakeT = 0;
 
   function freshPlayer() {
-    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30, gold: 0, weapon: 0, depthMax: 0, owned: [true] };
+    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30, gold: 0, banked: 0, weapon: 0, depthMax: 0, owned: [true] };
   }
 
   // ============================================================
@@ -489,10 +492,38 @@
   // ============================================================
   function openCamp() {
     state = "camp";
-    el.campSub.textContent = `B${player.r}F の脱出ポイント。所持金 ${player.gold}G`;
+    el.campSub.textContent = `B${player.r}F の脱出ポイント。送金して稼ぎを確保しよう。`;
+    renderBank();
     renderShop();
     show(el.ovCamp, true);
     sfx("heal");
+  }
+
+  function renderBank() {
+    el.bankBanked.textContent = player.banked;
+    el.bankCarry.textContent = player.gold;
+    const max = player.gold;
+    el.bankRange.max = String(max);
+    // default to sending everything you still carry
+    el.bankRange.value = String(max);
+    updateBankLabel();
+  }
+
+  function updateBankLabel() {
+    const amt = parseInt(el.bankRange.value, 10) || 0;
+    el.bankAmountLabel.textContent = amt + " G おくる";
+    el.btnSend.disabled = amt <= 0;
+  }
+
+  function sendToBank() {
+    const amt = Math.min(player.gold, parseInt(el.bankRange.value, 10) || 0);
+    if (amt <= 0) return;
+    player.gold -= amt;
+    player.banked += amt;
+    updateHUD();
+    renderBank();
+    renderShop(); // affordability changed
+    sfx("coin");
   }
 
   function renderShop() {
@@ -503,7 +534,7 @@
       el.shop.appendChild(shopRow("💊", "HP全回復", `HPを ${player.maxHp} まで回復`, healCost,
         player.gold >= healCost, false, () => {
           player.gold -= healCost; player.hp = player.maxHp;
-          updateHUD(); renderShop(); el.campSub.textContent = `所持金 ${player.gold}G`;
+          updateHUD(); renderBank(); renderShop();
         }));
     }
     // Max HP up
@@ -511,7 +542,7 @@
     el.shop.appendChild(shopRow("🛡️", "最大HPアップ", `最大HP +10（現在 ${player.maxHp}）`, hpUpCost,
       player.gold >= hpUpCost, false, () => {
         player.gold -= hpUpCost; player.maxHp += 10; player.hp += 10;
-        updateHUD(); renderShop();
+        updateHUD(); renderBank(); renderShop();
       }));
     // Weapons
     WEAPONS.forEach((w, i) => {
@@ -523,7 +554,7 @@
         !owned && player.gold >= w.cost, owned, () => {
           if (player.owned[i]) return;
           player.gold -= w.cost; player.owned[i] = true; player.weapon = i;
-          updateHUD(); renderShop();
+          updateHUD(); renderBank(); renderShop();
         });
       if (owned) {
         row.classList.add("owned");
@@ -570,17 +601,34 @@
 
   function finish(cleared) {
     state = "result";
-    const score = cleared ? player.gold : 0;
-    if (cleared && player.gold > best) {
-      best = player.gold;
+    let lost = 0;
+    if (cleared) {
+      // 脱出成功：手持ちも全部持ち帰る
+      player.banked += player.gold;
+      player.gold = 0;
+    } else {
+      // 死亡：手持ちは失う。貯金のみ記録に残る
+      lost = player.gold;
+      player.gold = 0;
+    }
+    const score = player.banked;
+    if (score > best) {
+      best = score;
       localStorage.setItem(BEST_KEY, String(best));
     }
     el.resultTitle.textContent = cleared ? "脱出成功！" : "GAME OVER";
     el.resultTitle.classList.toggle("clear", cleared);
     el.resultEmoji.textContent = cleared ? "🎉" : "💀";
     el.rsDepth.textContent = "B" + player.depthMax + "F";
-    el.rsScore.textContent = (cleared ? player.gold : 0) + " G";
+    if (!cleared && lost > 0) {
+      el.rsLost.textContent = lost + " G";
+      show(el.rsLostRow, true);
+    } else {
+      show(el.rsLostRow, false);
+    }
+    el.rsScore.textContent = score + " G";
     el.rsBest.textContent = best + " G";
+    updateHUD();
     show(el.ovResult, true);
     sfx(cleared ? "win" : "lose");
   }
@@ -596,6 +644,7 @@
     el.hpBar.style.background = pct < 30 ? "var(--hp-low)" : "var(--hp)";
     el.hpText.textContent = player.hp + "/" + player.maxHp;
     el.gold.textContent = player.gold;
+    el.bank.textContent = player.banked;
     el.depth.textContent = "B" + player.r + "F";
     el.weaponIcon.textContent = WEAPONS[player.weapon].emoji;
   }
@@ -652,6 +701,8 @@
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
   el.btnContinue.addEventListener("click", continueDig);
+  el.bankRange.addEventListener("input", updateBankLabel);
+  el.btnSend.addEventListener("click", sendToBank);
 
   // prevent gesture scroll/zoom — but allow scrolling inside scroll areas (shop list)
   document.addEventListener("touchmove", (e) => {

@@ -45,12 +45,12 @@ html, body {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   padding-top: max(8px, env(safe-area-inset-top));
   background: linear-gradient(#241710, #1b120a);
   border-bottom: 2px solid var(--border);
-  font-size: 14px;
+  font-size: 13px;
   z-index: 5;
 }
 #hud-hp { flex: 1; display: flex; align-items: center; gap: 6px; }
@@ -68,7 +68,7 @@ html, body {
   border: 2px solid var(--border);
   border-radius: 9px;
   overflow: hidden;
-  min-width: 70px;
+  min-width: 52px;
 }
 .bar-fill {
   height: 100%;
@@ -229,6 +229,30 @@ html, body {
 .shop-item .si-buy:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
 .shop-item.owned { opacity: .55; }
 .shop-item .si-buy.equipped { background: #4a6b3a; color: #d8f0c8; border-color: #3a5a2a; }
+/* Bank / 送金 */
+.bank {
+  width: 100%;
+  max-width: 360px;
+  flex: 0 0 auto;
+  background: var(--panel);
+  border: 2px solid #3a5a2a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+}
+.bank-head { font-size: 13px; color: #8fd09a; }
+.bank-stat { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.bank-stat b { color: var(--accent); }
+#bank-range { width: 100%; accent-color: #5fbf6f; height: 22px; }
+.bank-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#bank-amount-label { font-size: 14px; color: var(--text); }
+#btn-send { flex: 0 0 auto; background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; }
+#btn-send:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
+.lost { color: var(--danger) !important; }
+
 .camp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px; margin-top: 8px; }
 .btn-escape { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; font-weight: bold; }
 .btn-dig { background: linear-gradient(var(--accent-2), #b8651f); color: #2a1606; border-color: #8a5a1c; font-weight: bold; }

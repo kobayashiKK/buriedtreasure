@@ -20,6 +20,7 @@
         <div class="bar"><div class="bar-fill" id="hp-bar"></div><span id="hp-text">30/30</span></div>
       </div>
       <div class="hud-item" id="hud-gold"><span class="hud-icon">💰</span><span id="gold-text">0</span></div>
+      <div class="hud-item" id="hud-bank"><span class="hud-icon">🏦</span><span id="bank-text">0</span></div>
       <div class="hud-item" id="hud-weapon"><span class="hud-icon" id="weapon-icon">🏏</span></div>
       <div class="hud-item" id="hud-depth"><span class="hud-icon">🕳️</span><span id="depth-text">B0F</span></div>
     </header>
@@ -36,7 +37,8 @@
         <button class="btn btn-primary big" id="btn-start">ゲームスタート</button>
         <div class="howto">
           <p>下のパッドで穴を掘って進む。</p>
-          <p>💰財宝を集め、👹敵を倒し、🪜脱出ポイントで地上へ。</p>
+          <p>💰財宝を集め、敵を倒し、🪜脱出ポイントで地上へ。</p>
+          <p>🏦脱出ポイントで送金した分は、死んでも記録に残る。</p>
           <p>深く潜るほど敵は強く、稼ぎも大きい。</p>
         </div>
       </div>
@@ -59,6 +61,15 @@
       <div class="overlay overlay-panel scroll-area" id="ov-camp" hidden>
         <h2 class="camp-title">🪜 脱出ポイント</h2>
         <p class="camp-sub" id="camp-sub">ここから地上へ脱出できる。装備を整えて更に潜ることも。</p>
+        <div class="bank" id="bank">
+          <div class="bank-head">🏦 地上へ送金（死んでも記録に残る）</div>
+          <div class="bank-stat"><span>貯金 <b id="bank-banked">0</b>G</span><span>手持ち <b id="bank-carry">0</b>G</span></div>
+          <input type="range" id="bank-range" min="0" max="0" value="0" />
+          <div class="bank-row">
+            <span id="bank-amount-label">0 G おくる</span>
+            <button class="btn si-buy" id="btn-send">送金する</button>
+          </div>
+        </div>
         <div class="shop scroll-area" id="shop"></div>
         <div class="camp-actions">
           <button class="btn btn-escape" id="btn-escape">🪜 脱出する（クリア）</button>
@@ -72,7 +83,8 @@
         <div class="result-emoji" id="result-emoji">💀</div>
         <div class="result-score">
           <div class="rs-row"><span>到達</span><span id="rs-depth">B0F</span></div>
-          <div class="rs-row big"><span>スコア</span><span id="rs-score">0 G</span></div>
+          <div class="rs-row" id="rs-lost-row" hidden><span>失った手持ち</span><span id="rs-lost" class="lost">0 G</span></div>
+          <div class="rs-row big"><span>スコア（貯金）</span><span id="rs-score">0 G</span></div>
           <div class="rs-row"><span>最高記録</span><span id="rs-best">0 G</span></div>
         </div>
         <button class="btn btn-primary big" id="btn-retry">もう一度</button>
