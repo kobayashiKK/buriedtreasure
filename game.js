@@ -93,7 +93,7 @@
       return rows[r];
     } else {
       tiles = [];
-      const enemyP = Math.min(0.30, 0.14 + r * 0.006);
+      const enemyP = Math.min(0.28, 0.06 + r * 0.012);
       for (let c = 0; c < COLS; c++) {
         const x = Math.random();
         let t = "dirt";
@@ -375,11 +375,11 @@
   function startCombat(r, c) {
     const ed = enemyDataFor(r, c);
     const depth = r;
-    const hp = Math.round((10 + depth * 3.4) * (0.85 + Math.random() * 0.3));
+    const hp = Math.round((6 + depth * 2.4) * (0.9 + Math.random() * 0.25));
     combat = {
       r, c, name: ed.name, emoji: ed.emoji,
       hp, maxHp: hp,
-      atk: Math.max(2, Math.round((3 + depth * 1.15) * (0.85 + Math.random() * 0.3))),
+      atk: Math.max(1, Math.round((1.5 + depth * 0.7) * (0.9 + Math.random() * 0.25))),
       reward: 30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0),
       busy: false,
     };
