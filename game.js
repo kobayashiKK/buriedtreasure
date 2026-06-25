@@ -122,11 +122,28 @@
                         ["ランプの魔神","🧞"],["だいまどう","🧙"],["どくろ王","💀"],["いし神像","🗿"]] },
   ];
 
+  // ---- 魔境バイオーム(B200+)の層ごとの専用敵（BIOMESと並び順を対応） ----
+  const BIOME_ENEMIES = [
+    // 🌿 みどりの楽園
+    [["マンドラゴラ","🌱"],["どくチョウ","🦋"],["かぶとオーガ","🪲"],["サボテンマン","🌵"],["フラワーレイス","🌹"]],
+    // ☁️ あおぞらの底
+    [["てんしどり","🦢"],["ハーピー","🦜"],["くじゃく将","🦚"],["フラミンゴ兵","🦩"],["らいちょう","🐓"]],
+    // 🔮 むらさきの霧
+    [["ファントム","🦠"],["うずまきのぬし","🌀"],["しんかいイカ","🦑"],["エイリアン","👽"],["まようピエロ","🤡"]],
+    // 🌟 こがねの花園
+    [["おうごんアリ","🐜"],["ひまわり魔","🌻"],["こがねバッタ","🦗"],["はなのせい","🌼"],["つぼマミック","🏺"]],
+    // 🔥 あかい奈落
+    [["マグマゴーレム","🌋"],["ボムへい","🧨"],["サラマンダー","🦎"],["かえんバード","🦃"]],
+    // ✨ ほしぞらの間
+    [["せいざのぬし","🪐"],["つきのこ","🌙"],["ながれぼし","🌠"],["スターラビ","⭐"],["UFOへい","🛸"]],
+  ];
+
   // ---- Tile types ----
   // dirt, empty, rock, gold, gem, heart, enemy, surface
   function pickEnemy(depth) {
-    const tier = ENEMY_TIERS.find((t) => depth < t.until);
-    const e = tier.list[(Math.random() * tier.list.length) | 0];
+    const b = biomeFor(depth);
+    const list = b ? BIOME_ENEMIES[BIOMES.indexOf(b)] : ENEMY_TIERS.find((t) => depth < t.until).list;
+    const e = list[(Math.random() * list.length) | 0];
     return { name: e[0], emoji: e[1] };
   }
 
@@ -1363,7 +1380,7 @@
   }
 
   // ---- まもの図鑑 ----
-  const ALL_ENEMIES = ENEMY_TIERS.flatMap((t) => t.list); // [[name,emoji],...]
+  const ALL_ENEMIES = ENEMY_TIERS.flatMap((t) => t.list).concat(BIOME_ENEMIES.flat()); // [[name,emoji],...]
   function openDex() {
     const seen = new Set(profile.dex);
     el.dexCount.textContent = seen.size + "/" + ALL_ENEMIES.length;
