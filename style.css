@@ -209,6 +209,14 @@ html, body {
 .enemy-box { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 10px; }
 .enemy-emoji { font-size: 76px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,.6)); animation: bob 1.4s ease-in-out infinite; }
 @keyframes bob { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-7px); } }
+.enemy-emoji.boss {
+  animation: bob 1.4s ease-in-out infinite, bossAura 1.6s ease-in-out infinite;
+  font-size: 90px;
+}
+@keyframes bossAura {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(255,170,50,.7)) drop-shadow(0 0 14px rgba(220,60,160,.5)); }
+  50% { filter: drop-shadow(0 0 16px rgba(255,170,50,.95)) drop-shadow(0 0 30px rgba(220,60,160,.8)); }
+}
 .enemy-emoji.hit { animation: shake .25s; }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-9px)} 75%{transform:translateX(9px)} }
 .enemy-name { font-size: 20px; color: var(--text); }

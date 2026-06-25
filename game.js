@@ -6,6 +6,7 @@
 
   const COLS = 7;
   const CAMP_INTERVAL = 8; // 脱出ポイント every N floors
+  const BOSS_INTERVAL = 10; // ボス出現の間隔（脱出ポイント階とは重ねない）
   const SAVE_KEY = "buriedtreasure_save";
   const RUN_KEY = "buriedtreasure_run"; // 中断データ
 
@@ -48,7 +49,12 @@
     { name: "ホーリーランス",   emoji: "🔆", power: 140, cost: 18000 },
     { name: "ゴッドアクス",     emoji: "⚡", power: 195, cost: 38000 },
     { name: "天空の剣",        emoji: "🌟", power: 270, cost: 80000 },
+    // ボス専用ドロップ武器（店では買えない）
+    { name: "獣王の牙",     emoji: "🦷", power: 150, cost: 0, boss: true },
+    { name: "覇王の剣",     emoji: "🗡️", power: 240, cost: 0, boss: true },
+    { name: "滅びの竜剣",   emoji: "🐉", power: 360, cost: 0, boss: true },
   ];
+  const BOSS_WEAPON_BASE = 10; // WEAPONS内のボス武器の開始index（獣王の牙）
 
   // ---- Armor (ダメージ軽減) ----
   const ARMOR = [
@@ -72,6 +78,18 @@
     goldx2:    { name: "金運", emoji: "💰", desc: "敵を倒した報酬が2倍" },
   };
   const EFFECT_KEYS = Object.keys(EFFECTS);
+
+  // ---- ボス ----
+  const BOSS_TIERS = [
+    { until: 20, list: [["ガオウ", "🦁"], ["イノシシ王", "🐗"]] },
+    { until: 40, list: [["だいりゅう", "🐲"], ["ティラノ", "🦖"]] },
+    { until: Infinity, list: [["あんこくりゅう", "🐉"], ["ベヒーモス", "🦏"]] },
+  ];
+  function bossWeaponIndex(depth) {
+    if (depth < 20) return BOSS_WEAPON_BASE;     // 獣王の牙
+    if (depth < 40) return BOSS_WEAPON_BASE + 1; // 覇王の剣
+    return BOSS_WEAPON_BASE + 2;                 // 滅びの竜剣
+  }
 
   // ---- お供（なかま）：戦闘で一緒に攻撃する ----
   const COMPANIONS = [
@@ -265,6 +283,11 @@
       }
       // guarantee at least one non-rock so the floor is always passable
       if (tiles.every((t) => t === "rock")) tiles[(Math.random() * COLS) | 0] = "dirt";
+      // ボスは端寄りの列に配置（中央を通れば回避できる）
+      if (r % BOSS_INTERVAL === 0) {
+        const edges = [0, 1, COLS - 2, COLS - 1];
+        tiles[edges[(Math.random() * edges.length) | 0]] = "boss";
+      }
     }
     rows[r] = tiles;
     return tiles;
@@ -362,7 +385,7 @@
     }
 
     // base earth
-    if (t === "empty" || t === "camp" || t === "enemy" || t === "gold" || t === "gem" || t === "heart") {
+    if (t === "empty" || t === "camp" || t === "enemy" || t === "gold" || t === "gem" || t === "heart" || t === "boss") {
       // dug-out / cave background
       ctx.fillStyle = `hsl(26, 35%, ${Math.max(7, 18 - r * 0.3)}%)`;
       ctx.fillRect(x, y, TS + 1, TS + 1);
@@ -403,6 +426,36 @@
     } else if (t === "enemy") {
       const ed = enemyDataFor(r, c);
       emoji(ed.emoji, cx, cy);
+    } else if (t === "boss") {
+      drawBossAura(cx, cy, tAnim);
+      const bd = bossDataFor(r, c);
+      ctx.font = `${TS * 0.68}px serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(bd.emoji, cx, cy);
+    }
+  }
+
+  // たなびくオーラ
+  function drawBossAura(cx, cy, t) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    const R = TS * (0.52 + 0.14 * pulse);
+    const g = ctx.createRadialGradient(cx, cy, TS * 0.08, cx, cy, R);
+    g.addColorStop(0, "rgba(255,180,60,0.55)");
+    g.addColorStop(0.55, "rgba(220,60,160,0.30)");
+    g.addColorStop(1, "rgba(220,60,160,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+    // 揺らめく炎のオーラ
+    for (let k = 0; k < 6; k++) {
+      const a = t * 1.6 + k * (Math.PI * 2 / 6);
+      const rad = TS * (0.4 + 0.08 * Math.sin(t * 4 + k));
+      const wx = cx + Math.cos(a) * rad;
+      const wy = cy + Math.sin(a) * rad * 0.7;
+      ctx.fillStyle = `rgba(255,${110 + ((k * 30) % 120)},40,0.35)`;
+      ctx.save();
+      ctx.translate(wx, wy); ctx.rotate(a);
+      ctx.beginPath(); ctx.ellipse(0, 0, TS * 0.05, TS * 0.13, 0, 0, 7); ctx.fill();
+      ctx.restore();
     }
   }
 
@@ -412,6 +465,16 @@
     const k = r + "," + c;
     if (!enemyCache[k]) enemyCache[k] = pickEnemy(r);
     return enemyCache[k];
+  }
+  const bossCache = {};
+  function bossDataFor(r, c) {
+    const k = r + "," + c;
+    if (!bossCache[k]) {
+      const tier = BOSS_TIERS.find((tt) => r < tt.until);
+      const e = tier.list[(Math.random() * tier.list.length) | 0];
+      bossCache[k] = { name: e[0], emoji: e[1] };
+    }
+    return bossCache[k];
   }
 
   function drawPlayer(x, y) {
@@ -454,9 +517,11 @@
   //  Game loop
   // ============================================================
   let last = performance.now();
+  let tAnim = 0;
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    tAnim += dt;
     if (anim.t < 1) anim.t = Math.min(1, anim.t + dt / anim.dur);
     if (shakeT > 0) shakeT = Math.max(0, shakeT - dt * 4);
     for (const f of floaters) f.t += dt * 1.1;
@@ -493,7 +558,8 @@
 
     const t = tileAt(nr, nc);
     if (t === "rock") { bump(); return; }
-    if (t === "enemy") { startCombat(nr, nc); return; }
+    if (t === "enemy") { startCombat(nr, nc, false); return; }
+    if (t === "boss") { startCombat(nr, nc, true); return; }
     // collectible / dirt / empty
     collect(nr, nc, t);
     doMoveTo(nr, nc);
@@ -539,9 +605,9 @@
   let pendingAwaken = null;
   function tryAwaken() {
     let maxCost = -1;
-    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i]) maxCost = Math.max(maxCost, WEAPONS[i].cost);
+    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i] && !WEAPONS[i].boss) maxCost = Math.max(maxCost, WEAPONS[i].cost);
     const eligible = [];
-    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i] && WEAPONS[i].cost < maxCost) eligible.push(i);
+    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i] && !WEAPONS[i].boss && WEAPONS[i].cost < maxCost) eligible.push(i);
     if (eligible.length === 0) return null;
     const fresh = eligible.filter((i) => !weaponEffect(i));
     const pool = fresh.length ? fresh : eligible;
@@ -554,21 +620,27 @@
   // ============================================================
   //  Combat
   // ============================================================
-  function startCombat(r, c) {
-    const ed = enemyDataFor(r, c);
+  function startCombat(r, c, isBoss) {
     const depth = r;
-    const hp = Math.round((6 + depth * 2.4) * (0.9 + Math.random() * 0.25));
+    const ed = isBoss ? bossDataFor(r, c) : enemyDataFor(r, c);
+    const baseHp = (6 + depth * 2.4);
+    const hp = Math.round(baseHp * (isBoss ? 3 : 1) * (0.9 + Math.random() * 0.25));
+    const baseAtk = (1.5 + depth * 0.7);
     combat = {
-      r, c, name: ed.name, emoji: ed.emoji,
+      r, c, name: ed.name, emoji: ed.emoji, isBoss: !!isBoss,
       hp, maxHp: hp,
-      atk: Math.max(1, Math.round((1.5 + depth * 0.7) * (0.9 + Math.random() * 0.25))),
-      reward: 30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0),
+      atk: Math.max(1, Math.round(baseAtk * (isBoss ? 1.6 : 1) * (0.9 + Math.random() * 0.25))),
+      reward: isBoss
+        ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
+        : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
+      drop: isBoss ? bossWeaponIndex(depth) : -1,
       busy: false,
     };
     state = "combat";
     el.enemyEmoji.textContent = ed.emoji;
-    el.enemyName.textContent = ed.name + `  (B${depth}F)`;
-    el.combatLog.innerHTML = `<div>${ed.name} があらわれた！</div>`;
+    el.enemyEmoji.classList.toggle("boss", !!isBoss);
+    el.enemyName.textContent = (isBoss ? "👑【ボス】" : "") + ed.name + `  (B${depth}F)`;
+    el.combatLog.innerHTML = `<div>${isBoss ? "強大なオーラ…！ " : ""}${ed.name} があらわれた！</div>`;
     updateEnemyHp();
     renderCombatPets();
     show(el.ovCombat, true);
@@ -663,23 +735,33 @@
     const x2 = weaponEffect(player.weapon) === "goldx2";
     if (x2) reward *= 2;
     player.gold += reward;
-    if (!profile.dex.includes(combat.name)) { profile.dex.push(combat.name); persistProfile(); }
+    if (!combat.isBoss && !profile.dex.includes(combat.name)) { profile.dex.push(combat.name); persistProfile(); }
     el.enemyHpBar.style.width = "0%";
     el.enemyHpText.textContent = "0/" + combat.maxHp;
     logCombat(`${combat.name} をたおした！ <span class="dmg">💰+${reward}G</span>${x2 ? ' <span class="awk">金運2倍!</span>' : ""} を手に入れた！`);
+    // ボスは専用武器をドロップ
+    if (combat.isBoss && combat.drop >= 0) {
+      const di = combat.drop;
+      const newly = !player.owned[di];
+      player.owned[di] = true;
+      player.weapon = di; // 手に入れた専用武器を装備
+      logCombat(`<span class="awk">⚔️ ${WEAPONS[di].name}</span> を${newly ? "手に入れて装備した！" : "またドロップした！"}`);
+      el.enemyEmoji.classList.remove("boss");
+    }
     addFloater(combat.r, combat.c, "+" + reward + "G", "#f6c453");
     setTile(combat.r, combat.c, "empty");
     delete enemyCache[combat.r + "," + combat.c];
+    delete bossCache[combat.r + "," + combat.c];
     updateHUD();
-    sfx("coin");
-    const tr = combat.r, tc = combat.c;
+    sfx(combat.isBoss ? "win" : "coin");
+    const tr = combat.r, tc = combat.c, wasBoss = combat.isBoss;
     // keep the panel up briefly so the reward is clearly seen
     setTimeout(() => {
       show(el.ovCombat, false);
       state = "explore";
       combat = null;
       doMoveTo(tr, tc);
-    }, 850);
+    }, wasBoss ? 1300 : 850);
   }
 
   function flee() {
@@ -847,10 +929,16 @@
       (i) => { player.weapon = i; },
       (w, i) => {
         const eff = weaponEffect(i);
-        if (eff) return `⭐攻撃力 ${weaponBase(i)}・${EFFECTS[eff].emoji}${EFFECTS[eff].name}`;
-        return `攻撃力 ${w.power}`;
+        const tag = w.boss ? "👑" : "";
+        if (eff) return `${tag}⭐攻撃力 ${weaponBase(i)}・${EFFECTS[eff].emoji}${EFFECTS[eff].name}`;
+        return `${tag}攻撃力 ${w.power}`;
       },
-      (i) => !!weaponEffect(i)); // 覚醒したこん棒は表示して装備可能に
+      (i, owned) => {
+        const w = WEAPONS[i];
+        if (w.boss) return owned;              // ボス専用武器は入手時のみ表示
+        if (i === 0) return owned && !!weaponEffect(0); // こん棒は覚醒時のみ
+        return true;
+      });
 
     // --- armor ---
     el.shop.appendChild(shopHeader("🛡️ 防具（被ダメージ軽減）"));
@@ -887,11 +975,12 @@
     });
   }
 
-  // Generic weapon/armor list renderer. includeZero: 初期装備(index0)を表示するか
-  function equipSection(list, isOwned, getEquipped, buyEquip, justEquip, descFn, includeZero) {
+  // Generic weapon/armor list renderer. visibleFn(i, owned): その行を表示するか
+  function equipSection(list, isOwned, getEquipped, buyEquip, justEquip, descFn, visibleFn) {
     list.forEach((it, i) => {
-      if (i === 0 && !(includeZero && includeZero(i))) return; // 初期装備は通常非表示
       const owned = isOwned(i);
+      const vis = visibleFn ? visibleFn(i, owned) : (i !== 0);
+      if (!vis) return;
       const equipped = getEquipped() === i;
       const row = shopRow(it.emoji, it.name, descFn(it, i), it.cost,
         !owned && canAfford(it.cost), owned, () => {
@@ -1021,6 +1110,7 @@
     clearRun(); // 新規プレイは中断データを破棄
     rows = {};
     for (const k in enemyCache) delete enemyCache[k];
+    for (const k in bossCache) delete bossCache[k];
     player = freshPlayer();
     ensureRow(0);
     // open up a starting hole below
@@ -1064,6 +1154,7 @@
     if (!Array.isArray(player.armorPlus)) player.armorPlus = [];
     rows = {};
     for (const k in enemyCache) delete enemyCache[k];
+    for (const k in bossCache) delete bossCache[k];
     ensureRow(player.r);
     campOpenedAt = -1;
     floaters = [];
