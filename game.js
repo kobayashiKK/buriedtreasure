@@ -16,8 +16,11 @@
   const el = {
     hpBar: $("hp-bar"), hpText: $("hp-text"),
     gold: $("gold-text"), depth: $("depth-text"), weaponIcon: $("weapon-icon"), armorIcon: $("armor-icon"), bank: $("bank-text"),
-    ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"),
-    btnStart: $("btn-start"), btnReset: $("btn-reset"),
+    weaponPlus: $("weapon-plus"), armorPlus: $("armor-plus"),
+    ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"), rankTitle: $("rank-title"),
+    btnStart: $("btn-start"), btnReset: $("btn-reset"), btnDex: $("btn-dex"),
+    ovDex: $("ov-dex"), dexGrid: $("dex-grid"), dexCount: $("dex-count"), btnDexClose: $("btn-dex-close"),
+    rsRank: $("rs-rank"), rsNewtitle: $("rs-newtitle"), rsNewtitleName: $("rs-newtitle-name"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
     enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
     btnAttack: $("btn-attack"), btnFlee: $("btn-flee"),
@@ -88,12 +91,13 @@
   let profile = loadProfile();
 
   // ---- persistent profile ----
-  // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。
+  // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
-    return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30 };
+    return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
+             weaponPlus: [], armorPlus: [] };
   }
   function defaultProfile() {
-    return Object.assign({ bank: 0, deepest: 0 }, baseGear());
+    return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
   }
   function loadProfile() {
     try {
@@ -103,11 +107,14 @@
       return {
         bank: p.bank | 0,
         deepest: p.deepest | 0,
+        dex: Array.isArray(p.dex) ? p.dex : [],
         weapon: p.weapon | 0,
         owned: Array.isArray(p.owned) ? p.owned : d.owned,
         armor: p.armor | 0,
         ownedArmor: Array.isArray(p.ownedArmor) ? p.ownedArmor : d.ownedArmor,
         maxHp: p.maxHp ? (p.maxHp | 0) : d.maxHp,
+        weaponPlus: Array.isArray(p.weaponPlus) ? p.weaponPlus : [],
+        armorPlus: Array.isArray(p.armorPlus) ? p.armorPlus : [],
       };
     } catch (_) { return defaultProfile(); }
   }
@@ -120,15 +127,17 @@
     profile.deepest = Math.max(profile.deepest | 0, player.depthMax | 0);
     persistProfile();
   }
-  // 脱出成功時：現在の装備を持ち越し用に保存
+  // 脱出成功時：現在の装備（強化値含む）を持ち越し用に保存
   function saveGear() {
     profile.weapon = player.weapon;
     profile.owned = player.owned.slice();
     profile.armor = player.armor;
     profile.ownedArmor = player.ownedArmor.slice();
     profile.maxHp = player.maxHp;
+    profile.weaponPlus = player.weaponPlus.slice();
+    profile.armorPlus = player.armorPlus.slice();
   }
-  // 死亡時：持ち越し装備をリセット
+  // 死亡時：持ち越し装備をリセット（図鑑・貯金は残す）
   function resetGear() {
     Object.assign(profile, baseGear());
   }
@@ -147,7 +156,45 @@
     return { r: 0, c: (COLS / 2) | 0, hp: profile.maxHp, maxHp: profile.maxHp,
              gold: 0, banked: profile.bank, withdrawable: profile.bank,
              weapon: profile.weapon, owned: owned,
-             armor: profile.armor, ownedArmor: ownedArmor, depthMax: 0 };
+             armor: profile.armor, ownedArmor: ownedArmor,
+             weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
+             depthMax: 0 };
+  }
+
+  // ---- effective stats with + enhancement ----
+  function wStep(i) { return Math.max(2, Math.round(WEAPONS[i].power * 0.12)); }
+  function aStep(i) { return Math.max(1, Math.round((ARMOR[i].def || 1) * 0.18)); }
+  function weaponPower() {
+    const i = player.weapon;
+    return WEAPONS[i].power + (player.weaponPlus[i] || 0) * wStep(i);
+  }
+  function armorDef() {
+    const i = player.armor;
+    return ARMOR[i].def + (player.armorPlus[i] || 0) * aStep(i);
+  }
+  function enhanceCostW(i) {
+    const lv = player.weaponPlus[i] || 0;
+    return Math.round(WEAPONS[i].power * 22 * Math.pow(lv + 1, 1.6));
+  }
+  function enhanceCostA(i) {
+    const lv = player.armorPlus[i] || 0;
+    return Math.round((ARMOR[i].def + 2) * 55 * Math.pow(lv + 1, 1.6));
+  }
+
+  // ---- 称号 (titles by deepest depth) ----
+  const TITLES = [
+    [0, "みならい発掘者"], [5, "穴掘り見習い"], [10, "トレジャーハンター"],
+    [18, "地底の探検家"], [28, "洞窟のぬし"], [40, "深淵の踏破者"],
+    [55, "奈落の征服者"], [75, "伝説の発掘王"], [100, "神話の到達者"],
+  ];
+  function titleFor(depth) {
+    let t = TITLES[0][1];
+    for (const [d, name] of TITLES) if (depth >= d) t = name;
+    return t;
+  }
+  function nextTitle(depth) {
+    for (const [d, name] of TITLES) if (depth < d) return [d, name];
+    return null;
   }
 
   // ============================================================
@@ -480,8 +527,7 @@
   function playerAttack() {
     if (state !== "combat" || combat.busy) return;
     combat.busy = true; setCombatButtons(false);
-    const w = WEAPONS[player.weapon];
-    const dmg = Math.max(1, Math.round(w.power * (0.8 + Math.random() * 0.4)));
+    const dmg = Math.max(1, Math.round(weaponPower() * (0.8 + Math.random() * 0.4)));
     combat.hp -= dmg;
     el.enemyEmoji.classList.remove("hit"); void el.enemyEmoji.offsetWidth; el.enemyEmoji.classList.add("hit");
     logCombat(`${combat.name} に <span class="dmg">${dmg}</span> のダメージ！`);
@@ -498,7 +544,7 @@
 
   function enemyAttack(done) {
     const raw = Math.max(1, Math.round(combat.atk * (0.8 + Math.random() * 0.4)));
-    const def = ARMOR[player.armor].def;
+    const def = armorDef();
     const dmg = Math.max(1, raw - def);
     player.hp -= dmg;
     shakeT = 0.6;
@@ -513,6 +559,7 @@
   function winCombat() {
     const reward = combat.reward;
     player.gold += reward;
+    if (!profile.dex.includes(combat.name)) { profile.dex.push(combat.name); persistProfile(); }
     el.enemyHpBar.style.width = "0%";
     el.enemyHpText.textContent = "0/" + combat.maxHp;
     logCombat(`${combat.name} をたおした！ <span class="dmg">💰+${reward}G</span> を手に入れた！`);
@@ -695,6 +742,15 @@
       (i) => { player.ownedArmor[i] = true; player.armor = i; },
       (i) => { player.armor = i; },
       (a) => `防御力 ${a.def}`);
+
+    // --- enhancement (無限の金の使い道) ---
+    el.shop.appendChild(shopHeader("🔨 強化（装備中のものを+強化）"));
+    const wi = player.weapon, wlv = player.weaponPlus[wi] || 0, wcost = enhanceCostW(wi), wp = weaponPower();
+    el.shop.appendChild(shopRow("⚔️", `${WEAPONS[wi].name} +${wlv}`, `攻撃力 ${wp} → ${wp + wStep(wi)}`, wcost,
+      canAfford(wcost), false, () => { pay(wcost); player.weaponPlus[wi] = wlv + 1; afterPurchase(); }));
+    const ai = player.armor, alv = player.armorPlus[ai] || 0, acost = enhanceCostA(ai), ap = armorDef();
+    el.shop.appendChild(shopRow("🛡️", `${ARMOR[ai].name} +${alv}`, `防御力 ${ap} → ${ap + aStep(ai)}`, acost,
+      canAfford(acost), false, () => { pay(acost); player.armorPlus[ai] = alv + 1; afterPurchase(); }));
   }
 
   // Generic weapon/armor list renderer
@@ -761,6 +817,7 @@
 
   function finish(cleared) {
     state = "result";
+    const prevDeepest = profile.deepest | 0;
     let lost = 0;
     if (cleared) {
       // 脱出成功：手持ちも全部持ち帰り、装備も次回へ持ち越す
@@ -786,6 +843,15 @@
     }
     el.rsScore.textContent = player.banked + " G";
     el.rsBest.textContent = "B" + profile.deepest + "F";
+    el.rsRank.textContent = titleFor(profile.deepest);
+    // 新しい称号を獲得したか
+    const newRank = titleFor(player.depthMax);
+    if (newRank !== titleFor(prevDeepest)) {
+      el.rsNewtitleName.textContent = newRank;
+      show(el.rsNewtitle, true);
+    } else {
+      show(el.rsNewtitle, false);
+    }
     updateHUD();
     show(el.ovResult, true);
     sfx(cleared ? "win" : "lose");
@@ -806,6 +872,10 @@
     el.depth.textContent = "B" + player.r + "F";
     el.weaponIcon.textContent = WEAPONS[player.weapon].emoji;
     el.armorIcon.textContent = ARMOR[player.armor].emoji;
+    const wlv = player.weaponPlus[player.weapon] || 0;
+    const alv = player.armorPlus[player.armor] || 0;
+    el.weaponPlus.textContent = wlv ? "+" + wlv : "";
+    el.armorPlus.textContent = alv ? "+" + alv : "";
   }
 
   // ============================================================
@@ -857,13 +927,17 @@
   el.btnStart.addEventListener("click", startGame);
   el.btnRetry.addEventListener("click", startGame);
   el.btnReset.addEventListener("click", () => {
-    if (!confirm("貯金と記録をすべて消してリセットしますか？")) return;
-    try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+    if (!confirm("貯金と記録をすべて消してリセットしますか？（図鑑は残ります）")) return;
+    const keepDex = profile.dex; // 図鑑コレクションは残す
     profile = defaultProfile();
+    profile.dex = keepDex;
+    persistProfile();
     player = freshPlayer();
     updateTitle();
     updateHUD();
   });
+  el.btnDex.addEventListener("click", openDex);
+  el.btnDexClose.addEventListener("click", closeDex);
   el.btnAttack.addEventListener("click", playerAttack);
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
@@ -919,7 +993,26 @@
   function updateTitle() {
     el.bestTitle.textContent = profile.bank;
     el.deepestTitle.textContent = "B" + profile.deepest + "F";
+    el.rankTitle.textContent = titleFor(profile.deepest);
   }
+
+  // ---- まもの図鑑 ----
+  const ALL_ENEMIES = ENEMY_TIERS.flatMap((t) => t.list); // [[name,emoji],...]
+  function openDex() {
+    const seen = new Set(profile.dex);
+    el.dexCount.textContent = seen.size + "/" + ALL_ENEMIES.length;
+    el.dexGrid.innerHTML = "";
+    ALL_ENEMIES.forEach(([name, emoji]) => {
+      const got = seen.has(name);
+      const cell = document.createElement("div");
+      cell.className = "dex-cell" + (got ? "" : " unknown");
+      cell.innerHTML = `<div class="dex-emoji">${got ? emoji : "❓"}</div><div class="dex-name">${got ? name : "？？？"}</div>`;
+      el.dexGrid.appendChild(cell);
+    });
+    show(el.ovDex, true);
+  }
+  function closeDex() { show(el.ovDex, false); }
+
   updateTitle();
   player = freshPlayer();
   ensureRow(0);

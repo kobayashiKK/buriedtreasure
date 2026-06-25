@@ -160,6 +160,43 @@ html, body {
   box-shadow: 0 4px 0 #7a4a16;
 }
 .btn-primary:active { box-shadow: 0 1px 0 #7a4a16; }
+.hud-plus { font-size: 11px; color: var(--accent); font-weight: bold; margin-left: -2px; }
+.title-rank { font-size: 15px; color: var(--accent-2); }
+.btn-dex {
+  font-size: 14px;
+  padding: 9px 16px;
+  background: var(--panel-light);
+  border-color: var(--border);
+  color: var(--text);
+}
+.rs-newtitle {
+  font-size: 15px;
+  color: var(--accent);
+  background: rgba(246,196,83,.12);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.dex-count { font-size: 13px; color: var(--muted); }
+.dex-grid {
+  width: 100%;
+  max-width: 380px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.dex-cell {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 4px;
+  text-align: center;
+}
+.dex-cell.unknown { opacity: .6; }
+.dex-emoji { font-size: 30px; line-height: 1.2; }
+.dex-name { font-size: 11px; color: var(--text); margin-top: 2px; }
+.dex-cell.unknown .dex-name { color: var(--muted); }
 .btn-reset {
   font-size: 12px;
   padding: 7px 12px;
