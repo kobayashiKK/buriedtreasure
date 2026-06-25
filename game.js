@@ -24,7 +24,7 @@
     ovDex: $("ov-dex"), dexGrid: $("dex-grid"), dexCount: $("dex-count"), btnDexClose: $("btn-dex-close"),
     rsRank: $("rs-rank"), rsNewtitle: $("rs-newtitle"), rsNewtitleName: $("rs-newtitle-name"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
-    enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"),
+    enemyHpBar: $("enemy-hp-bar"), enemyHpText: $("enemy-hp-text"), combatLog: $("combat-log"), combatPets: $("combat-pets"),
     btnAttack: $("btn-attack"), btnFlee: $("btn-flee"),
     ovCamp: $("ov-camp"), campSub: $("camp-sub"), shop: $("shop"), awakenNotice: $("awaken-notice"),
     btnEscape: $("btn-escape"), btnContinue: $("btn-continue"),
@@ -73,6 +73,16 @@
   };
   const EFFECT_KEYS = Object.keys(EFFECTS);
 
+  // ---- お供（なかま）：戦闘で一緒に攻撃する ----
+  const COMPANIONS = [
+    { name: "こいぬ",     emoji: "🐶", power: 5,  cost: 300 },
+    { name: "ねこ",       emoji: "🐱", power: 8,  cost: 800 },
+    { name: "たか",       emoji: "🦅", power: 13, cost: 1800 },
+    { name: "おおかみ",   emoji: "🐺", power: 21, cost: 4200 },
+    { name: "くま",       emoji: "🐻", power: 33, cost: 9000 },
+    { name: "りゅうの子", emoji: "🐲", power: 52, cost: 21000 },
+  ];
+
   // ---- Enemy pools by depth tier (やさしい見た目のマイルドな魔物) ----
   const ENEMY_TIERS = [
     { until: 8,  list: [["スライム","🟢"],["ぷちうさぎ","🐰"],["おおねずみ","🐭"],["ひよこどり","🐤"]] },
@@ -106,7 +116,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, comp: [] };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -128,6 +138,7 @@
         weaponPlus: Array.isArray(p.weaponPlus) ? p.weaponPlus : [],
         armorPlus: Array.isArray(p.armorPlus) ? p.armorPlus : [],
         awaken: (p.awaken && typeof p.awaken === "object") ? p.awaken : {},
+        comp: Array.isArray(p.comp) ? p.comp : [],
       };
     } catch (_) { return defaultProfile(); }
   }
@@ -150,6 +161,7 @@
     profile.weaponPlus = player.weaponPlus.slice();
     profile.armorPlus = player.armorPlus.slice();
     profile.awaken = Object.assign({}, player.awaken);
+    profile.comp = player.comp.slice();
   }
   // 死亡時：持ち越し装備をリセット（図鑑・貯金は残す）
   function resetGear() {
@@ -172,8 +184,8 @@
              weapon: profile.weapon, owned: owned,
              armor: profile.armor, ownedArmor: ownedArmor,
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
-             awaken: Object.assign({}, profile.awaken), campCount: 0,
-             depthMax: 0 };
+             awaken: Object.assign({}, profile.awaken), comp: profile.comp.slice(),
+             campCount: 0, depthMax: 0 };
   }
 
   // ---- effective stats with + enhancement / 覚醒 ----
@@ -558,6 +570,7 @@
     el.enemyName.textContent = ed.name + `  (B${depth}F)`;
     el.combatLog.innerHTML = `<div>${ed.name} があらわれた！</div>`;
     updateEnemyHp();
+    renderCombatPets();
     show(el.ovCombat, true);
     setCombatButtons(true);
   }
@@ -595,6 +608,14 @@
       logCombat(`<span class="awk">💞 吸収</span> HP+${heal}`);
       updateHUD();
     }
+    // お供（なかま）も一緒に攻撃
+    if (combat.hp > 0) {
+      const ct = companionDamage();
+      if (ct > 0) {
+        combat.hp -= ct;
+        logCombat(`🐾 なかまの攻撃！ <span class="dmg">${ct}</span> のダメージ！`);
+      }
+    }
     updateEnemyHp();
     sfx("hit");
 
@@ -604,6 +625,23 @@
     }
     // enemy retaliates
     setTimeout(() => enemyAttack(() => { combat.busy = false; setCombatButtons(true); }), 480);
+  }
+
+  function companionDamage() {
+    let total = 0;
+    for (let i = 0; i < COMPANIONS.length; i++) {
+      if (player.comp[i]) total += Math.max(1, Math.round(COMPANIONS[i].power * (0.8 + Math.random() * 0.4)));
+    }
+    return total;
+  }
+  function renderCombatPets() {
+    const owned = COMPANIONS.filter((c, i) => player.comp[i]);
+    if (owned.length) {
+      el.combatPets.innerHTML = "なかま " + owned.map((c) => c.emoji).join("");
+      show(el.combatPets, true);
+    } else {
+      show(el.combatPets, false);
+    }
   }
 
   function enemyAttack(done) {
@@ -830,6 +868,23 @@
     const ai = player.armor, alv = player.armorPlus[ai] || 0, acost = enhanceCostA(ai), ap = armorDef();
     el.shop.appendChild(shopRow("🛡️", `${ARMOR[ai].name} +${alv}`, `防御力 ${ap} → ${ap + aStep(ai)}`, acost,
       canAfford(acost), false, () => { pay(acost); player.armorPlus[ai] = alv + 1; afterPurchase(); }));
+
+    // --- companions (なかま) ---
+    el.shop.appendChild(shopHeader("🐾 なかま（戦闘で一緒に攻撃）"));
+    COMPANIONS.forEach((c, i) => {
+      const owned = !!player.comp[i];
+      const row = shopRow(c.emoji, c.name, `攻撃力 +${c.power}`, c.cost,
+        !owned && canAfford(c.cost), owned, () => {
+          if (player.comp[i]) return;
+          pay(c.cost); player.comp[i] = true; afterPurchase();
+        });
+      if (owned) {
+        const buy = row.querySelector(".si-buy");
+        row.classList.add("owned");
+        buy.textContent = "なかま"; buy.classList.add("equipped"); buy.disabled = true;
+      }
+      el.shop.appendChild(row);
+    });
   }
 
   // Generic weapon/armor list renderer. includeZero: 初期装備(index0)を表示するか

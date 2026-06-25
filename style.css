@@ -228,6 +228,7 @@ html, body {
 }
 .combat-log .dmg { color: var(--accent); }
 .combat-log .hurt { color: var(--danger); }
+.combat-pets { font-size: 22px; letter-spacing: 2px; color: var(--muted); margin-top: 4px; }
 .combat-actions { display: flex; gap: 12px; margin-top: auto; margin-bottom: 14px; width: 100%; max-width: 320px; }
 .combat-actions .btn { flex: 1; }
 .btn-attack { background: linear-gradient(#e85a3b, #b8331f); color: #fff; border-color: #7a2010; font-weight: bold; }
