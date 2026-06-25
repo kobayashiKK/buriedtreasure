@@ -138,6 +138,7 @@
   let player = null;
   let combat = null;
   let campOpenedAt = -1;
+  let lastBiomeName = null;
   let pendingMove = null;
   let profile = loadProfile();
 
@@ -327,9 +328,31 @@
   // ============================================================
   const PLAYER_SCREEN_FRAC = 0.34;
 
+  // B200以降は「魔境」バイオームへ。30階ごとに景観が変化（メイドインアビス風）
+  const BIOME_START = 200;
+  const BIOME_SPAN = 30;
+  const BIOMES = [
+    { name: "みどりの楽園", emoji: "🌿", wall: [115, 45, 26], cave: [125, 42, 13] },
+    { name: "あおぞらの底", emoji: "☁️", wall: [205, 50, 58], cave: [200, 65, 74], bright: true },
+    { name: "むらさきの霧", emoji: "🔮", wall: [282, 44, 30], cave: [276, 42, 15] },
+    { name: "こがねの花園", emoji: "🌟", wall: [44, 68, 42], cave: [40, 58, 22] },
+    { name: "あかい奈落",   emoji: "🔥", wall: [4, 58, 32], cave: [2, 55, 15] },
+    { name: "ほしぞらの間", emoji: "✨", wall: [230, 40, 24], cave: [235, 55, 10] },
+  ];
+  function biomeFor(r) {
+    if (r < BIOME_START) return null;
+    return BIOMES[Math.floor((r - BIOME_START) / BIOME_SPAN) % BIOMES.length];
+  }
   function dirtColor(r) {
+    const b = biomeFor(r);
+    if (b) return `hsl(${b.wall[0]}, ${b.wall[1]}%, ${b.wall[2]}%)`;
     const l = Math.max(11, 30 - r * 0.45);
     return `hsl(26, 42%, ${l}%)`;
+  }
+  function caveColor(r) {
+    const b = biomeFor(r);
+    if (b) return `hsl(${b.cave[0]}, ${b.cave[1]}%, ${b.cave[2]}%)`;
+    return `hsl(26, 35%, ${Math.max(7, 18 - r * 0.3)}%)`;
   }
 
   function draw() {
@@ -398,7 +421,7 @@
     // base earth
     if (t === "empty" || t === "camp" || t === "enemy" || t === "gold" || t === "gem" || t === "heart" || t === "boss") {
       // dug-out / cave background
-      ctx.fillStyle = `hsl(26, 35%, ${Math.max(7, 18 - r * 0.3)}%)`;
+      ctx.fillStyle = caveColor(r);
       ctx.fillRect(x, y, TS + 1, TS + 1);
     } else if (t === "rock") {
       ctx.fillStyle = dirtColor(r);
@@ -603,6 +626,13 @@
     }
     updateHUD();
     sfx("dig");
+    // 魔境バイオームに入ったら告知
+    const b = biomeFor(nr);
+    const bn = b ? b.name : null;
+    if (bn !== lastBiomeName) {
+      lastBiomeName = bn;
+      if (b) { addFloater(nr, nc, `${b.emoji} ${b.name}`, "#ffe9b0"); sfx("heal"); }
+    }
     if (rows[nr] && rows[nr].isCamp && campOpenedAt !== nr) {
       campOpenedAt = nr;
       player.campCount = (player.campCount | 0) + 1;
@@ -1168,6 +1198,7 @@
     // open up a starting hole below
     setTile(1, player.c, "dirt");
     campOpenedAt = -1;
+    lastBiomeName = biomeFor(player.r) ? biomeFor(player.r).name : null;
     floaters = [];
     anim = { fromR: 0, fromC: player.c, t: 1, dur: 0.13 };
     camRow = 0;
@@ -1209,6 +1240,7 @@
     for (const k in bossCache) delete bossCache[k];
     ensureRow(player.r);
     campOpenedAt = -1;
+    lastBiomeName = biomeFor(player.r) ? biomeFor(player.r).name : null;
     floaters = [];
     anim = { fromR: player.r, fromC: player.c, t: 1, dur: 0.13 };
     camRow = player.r;
