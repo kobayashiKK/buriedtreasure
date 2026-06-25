@@ -343,6 +343,20 @@ html, body {
 .bank-btn.dep { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; }
 .bank-btn.wd { background: linear-gradient(var(--accent), var(--accent-2)); color: #2a1606; border-color: #8a5a1c; }
 .bank-btn:disabled { background: #3a2818 !important; color: #6b5a42 !important; border-color: #4a3422 !important; }
+.awaken-notice {
+  width: 100%;
+  max-width: 360px;
+  font-size: 12px;
+  color: #ffe9b0;
+  background: rgba(246,196,83,.14);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 10px;
+  text-align: left;
+  flex: 0 0 auto;
+}
+.awaken-notice b { color: var(--accent); }
+.awk { color: var(--accent); font-weight: bold; }
 .bank-note { font-size: 10px; color: var(--muted); }
 .bank-note b { color: var(--accent); }
 .lost { color: var(--danger) !important; }
