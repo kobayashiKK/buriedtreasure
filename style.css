@@ -350,6 +350,9 @@ html, body {
 .camp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px; margin-top: 8px; }
 .btn-escape { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; font-weight: bold; }
 .btn-dig { background: linear-gradient(var(--accent-2), #b8651f); color: #2a1606; border-color: #8a5a1c; font-weight: bold; }
+.btn-suspend { background: var(--panel-light); border-color: var(--border); color: var(--text); }
+.btn-resume { background: linear-gradient(#6db6e0, #3a7fb0); color: #042032; border-color: #2a6088; font-weight: bold; box-shadow: 0 4px 0 #234a66; }
+.btn-resume:active { box-shadow: 0 1px 0 #234a66; }
 
 /* Result */
 .result-title { font-size: 40px; margin: 0; color: var(--danger); text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }

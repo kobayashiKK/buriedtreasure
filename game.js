@@ -7,6 +7,7 @@
   const COLS = 7;
   const CAMP_INTERVAL = 8; // 脱出ポイント every N floors
   const SAVE_KEY = "buriedtreasure_save";
+  const RUN_KEY = "buriedtreasure_run"; // 中断データ
 
   // ---- DOM ----
   const $ = (id) => document.getElementById(id);
@@ -19,6 +20,7 @@
     weaponPlus: $("weapon-plus"), armorPlus: $("armor-plus"),
     ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"), rankTitle: $("rank-title"),
     btnStart: $("btn-start"), btnReset: $("btn-reset"), btnDex: $("btn-dex"),
+    btnResume: $("btn-resume"), resumeFloor: $("resume-floor"), btnSuspend: $("btn-suspend"),
     ovDex: $("ov-dex"), dexGrid: $("dex-grid"), dexCount: $("dex-count"), btnDexClose: $("btn-dex-close"),
     rsRank: $("rs-rank"), rsNewtitle: $("rs-newtitle"), rsNewtitleName: $("rs-newtitle-name"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
@@ -831,6 +833,7 @@
       resetGear();
     }
     saveMoney(); // 貯金・最高到達を保存（装備は上で確定済み）
+    clearRun(); // ランが終了したので中断データは破棄
     el.resultTitle.textContent = cleared ? "脱出成功！" : "ちからつきた…";
     el.resultTitle.classList.toggle("clear", cleared);
     el.resultEmoji.textContent = cleared ? "🎉" : "💀";
@@ -882,6 +885,7 @@
   //  Start / restart
   // ============================================================
   function startGame() {
+    clearRun(); // 新規プレイは中断データを破棄
     rows = {};
     for (const k in enemyCache) delete enemyCache[k];
     player = freshPlayer();
@@ -898,6 +902,46 @@
     show(el.ovCombat, false);
     show(el.ovCamp, false);
     updateHUD();
+  }
+
+  // ---- 中断 / 再開 ----
+  function hasRun() { return !!localStorage.getItem(RUN_KEY); }
+  function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (_) {} }
+
+  // 脱出ポイントで中断：ラン状態を保存してタイトルへ
+  function suspendGame() {
+    try { localStorage.setItem(RUN_KEY, JSON.stringify(player)); } catch (_) {}
+    saveMoney();
+    show(el.ovCamp, false);
+    show(el.ovResult, false);
+    show(el.ovCombat, false);
+    state = "title";
+    updateTitle();
+    show(el.ovTitle, true);
+  }
+
+  // タイトルから中断データで再開：中断した階層（脱出ポイント）から
+  function resumeRun() {
+    let snap;
+    try { snap = JSON.parse(localStorage.getItem(RUN_KEY)); } catch (_) { snap = null; }
+    if (!snap) { updateTitle(); return; }
+    clearRun(); // 一度きり（消費）
+    player = snap;
+    if (!Array.isArray(player.weaponPlus)) player.weaponPlus = [];
+    if (!Array.isArray(player.armorPlus)) player.armorPlus = [];
+    rows = {};
+    for (const k in enemyCache) delete enemyCache[k];
+    ensureRow(player.r);
+    campOpenedAt = -1;
+    floaters = [];
+    anim = { fromR: player.r, fromC: player.c, t: 1, dur: 0.13 };
+    camRow = player.r;
+    state = "explore";
+    show(el.ovTitle, false);
+    show(el.ovResult, false);
+    show(el.ovCombat, false);
+    updateHUD();
+    openCamp(); // 中断した脱出ポイントを再表示
   }
 
   // ============================================================
@@ -924,7 +968,10 @@
     else if (state === "combat") { if (e.key === " " || e.key === "Enter") playerAttack(); if (e.key === "Escape") flee(); }
   });
 
-  el.btnStart.addEventListener("click", startGame);
+  el.btnStart.addEventListener("click", () => {
+    if (hasRun() && !confirm("中断データがあります。新しく始めると中断データは消えます。よろしいですか？")) return;
+    startGame();
+  });
   el.btnRetry.addEventListener("click", startGame);
   el.btnReset.addEventListener("click", () => {
     if (!confirm("貯金と記録をすべて消してリセットしますか？（図鑑は残ります）")) return;
@@ -938,6 +985,8 @@
   });
   el.btnDex.addEventListener("click", openDex);
   el.btnDexClose.addEventListener("click", closeDex);
+  el.btnResume.addEventListener("click", resumeRun);
+  el.btnSuspend.addEventListener("click", suspendGame);
   el.btnAttack.addEventListener("click", playerAttack);
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
@@ -994,6 +1043,15 @@
     el.bestTitle.textContent = profile.bank;
     el.deepestTitle.textContent = "B" + profile.deepest + "F";
     el.rankTitle.textContent = titleFor(profile.deepest);
+    // 中断データがあれば再開ボタンを表示
+    let floor = 0;
+    if (hasRun()) {
+      try { floor = (JSON.parse(localStorage.getItem(RUN_KEY)) || {}).r | 0; } catch (_) {}
+      el.resumeFloor.textContent = "B" + floor + "F";
+      show(el.btnResume, true);
+    } else {
+      show(el.btnResume, false);
+    }
   }
 
   // ---- まもの図鑑 ----
