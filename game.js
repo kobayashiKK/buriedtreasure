@@ -87,23 +87,50 @@
   let pendingMove = null;
   let profile = loadProfile();
 
-  // ---- persistent profile: only money (貯金) carries over, not equipment ----
+  // ---- persistent profile ----
+  // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。
+  function baseGear() {
+    return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30 };
+  }
   function defaultProfile() {
-    return { bank: 0, deepest: 0 };
+    return Object.assign({ bank: 0, deepest: 0 }, baseGear());
   }
   function loadProfile() {
     try {
       const p = JSON.parse(localStorage.getItem(SAVE_KEY));
       if (!p || typeof p !== "object") return defaultProfile();
-      return { bank: p.bank | 0, deepest: p.deepest | 0 };
+      const d = defaultProfile();
+      return {
+        bank: p.bank | 0,
+        deepest: p.deepest | 0,
+        weapon: p.weapon | 0,
+        owned: Array.isArray(p.owned) ? p.owned : d.owned,
+        armor: p.armor | 0,
+        ownedArmor: Array.isArray(p.ownedArmor) ? p.ownedArmor : d.ownedArmor,
+        maxHp: p.maxHp ? (p.maxHp | 0) : d.maxHp,
+      };
     } catch (_) { return defaultProfile(); }
   }
-  function saveProfile() {
-    profile = {
-      bank: player.banked,
-      deepest: Math.max(profile.deepest | 0, player.depthMax | 0),
-    };
+  function persistProfile() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch (_) {}
+  }
+  // お金と最高到達のみ更新（装備はそのまま）
+  function saveMoney() {
+    profile.bank = player.banked;
+    profile.deepest = Math.max(profile.deepest | 0, player.depthMax | 0);
+    persistProfile();
+  }
+  // 脱出成功時：現在の装備を持ち越し用に保存
+  function saveGear() {
+    profile.weapon = player.weapon;
+    profile.owned = player.owned.slice();
+    profile.armor = player.armor;
+    profile.ownedArmor = player.ownedArmor.slice();
+    profile.maxHp = player.maxHp;
+  }
+  // 死亡時：持ち越し装備をリセット
+  function resetGear() {
+    Object.assign(profile, baseGear());
   }
 
   // animation
@@ -112,13 +139,15 @@
   let floaters = []; // {r,c,text,color,t}
   let shakeT = 0;
 
-  // Each run starts with base equipment; only 貯金 (bank) carries over.
-  // withdrawable = 前回までの繰り越し分のみ。今回預けた分は次回ゲームまで引き出せない。
+  // お金は常に持ち越し。装備は前回「脱出」していれば profile から引き継ぐ。
+  // withdrawable = 前回までの繰り越し貯金のみ。今回預けた分は次回ゲームまで引き出せない。
   function freshPlayer() {
-    return { r: 0, c: (COLS / 2) | 0, hp: 30, maxHp: 30,
+    const owned = profile.owned.slice(); owned[0] = true;
+    const ownedArmor = profile.ownedArmor.slice(); ownedArmor[0] = true;
+    return { r: 0, c: (COLS / 2) | 0, hp: profile.maxHp, maxHp: profile.maxHp,
              gold: 0, banked: profile.bank, withdrawable: profile.bank,
-             weapon: 0, owned: [true],
-             armor: 0, ownedArmor: [true], depthMax: 0 };
+             weapon: profile.weapon, owned: owned,
+             armor: profile.armor, ownedArmor: ownedArmor, depthMax: 0 };
   }
 
   // ============================================================
@@ -615,7 +644,7 @@
   }
 
   function afterBankMove() {
-    saveProfile();
+    saveMoney();
     updateHUD();
     depSlider.setVal(0);
     wdSlider.setVal(0);
@@ -628,7 +657,7 @@
   function canAfford(cost) { return player.gold >= cost; }
   function pay(cost) { player.gold -= cost; }
   function afterPurchase() {
-    saveProfile();
+    saveMoney();
     updateHUD();
     renderBank();
     renderShop();
@@ -686,7 +715,7 @@
           buy.textContent = "装備中"; buy.classList.add("equipped"); buy.disabled = true;
         } else {
           buy.textContent = "装備する"; buy.disabled = false;
-          buy.onclick = () => { justEquip(i); saveProfile(); updateHUD(); renderShop(); };
+          buy.onclick = () => { justEquip(i); updateHUD(); renderShop(); };
         }
       }
       el.shop.appendChild(row);
@@ -734,16 +763,17 @@
     state = "result";
     let lost = 0;
     if (cleared) {
-      // 脱出成功：手持ちも全部持ち帰る
+      // 脱出成功：手持ちも全部持ち帰り、装備も次回へ持ち越す
       player.banked += player.gold;
       player.gold = 0;
+      saveGear();
     } else {
-      // 死亡：手持ちは失う。貯金のみ記録に残る
+      // 死亡：手持ちは失い、持ち越し装備もリセット。貯金のみ残る
       lost = player.gold;
       player.gold = 0;
+      resetGear();
     }
-    // 貯金・装備・最高到達を保存して次回へ持ち越し
-    saveProfile();
+    saveMoney(); // 貯金・最高到達を保存（装備は上で確定済み）
     el.resultTitle.textContent = cleared ? "脱出成功！" : "ちからつきた…";
     el.resultTitle.classList.toggle("clear", cleared);
     el.resultEmoji.textContent = cleared ? "🎉" : "💀";
