@@ -361,7 +361,7 @@
     } else if (t === "gem") {
       emoji("💎", cx, cy);
     } else if (t === "heart") {
-      emoji("❤️", cx, cy);
+      emoji("💗", cx, cy);
     } else if (t === "camp") {
       emoji("🪜", cx, cy);
     } else if (t === "enemy") {
