@@ -34,7 +34,7 @@
     depAmt: $("dep-amt"), btnDeposit: $("btn-deposit"),
     wdAmt: $("wd-amt"), btnWithdraw: $("btn-withdraw"),
     ovResult: $("ov-result"), resultTitle: $("result-title"), resultEmoji: $("result-emoji"),
-    rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"),
+    rsDepth: $("rs-depth"), rsScore: $("rs-score"), rsBest: $("rs-best"), btnRetry: $("btn-retry"), btnHome: $("btn-home"),
     rsLostRow: $("rs-lost-row"), rsLost: $("rs-lost"),
   };
 
@@ -1260,6 +1260,16 @@
   }
   function closeWarp() { show(el.ovWarp, false); }
 
+  // 結果画面からタイトルへ戻る
+  function goHome() {
+    show(el.ovResult, false);
+    show(el.ovCombat, false);
+    show(el.ovCamp, false);
+    state = "title";
+    updateTitle();
+    show(el.ovTitle, true);
+  }
+
   // ---- 中断 / 再開 ----
   function hasRun() { return !!localStorage.getItem(RUN_KEY); }
   function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (_) {} }
@@ -1330,7 +1340,8 @@
     if (hasRun() && !confirm("中断データがあります。新しく始めると中断データは消えます。よろしいですか？")) return;
     startGame();
   });
-  el.btnRetry.addEventListener("click", startGame);
+  el.btnRetry.addEventListener("click", () => startGame());
+  el.btnHome.addEventListener("click", goHome);
   el.btnReset.addEventListener("click", () => {
     if (!confirm("貯金と記録をすべて消してリセットしますか？（図鑑は残ります）")) return;
     const keepDex = profile.dex; // 図鑑コレクションは残す

@@ -378,6 +378,7 @@ html, body {
 .btn-resume:active { box-shadow: 0 1px 0 #234a66; }
 .btn-warp { font-size: 14px; padding: 9px 16px; background: linear-gradient(#a06bd0, #6a3fb0); color: #f0e6ff; border-color: #4a2a80; font-weight: bold; }
 .btn-warp:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
+.btn-home { font-size: 15px; padding: 10px 18px; background: var(--panel-light); border-color: var(--border); color: var(--text); }
 .warp-list { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
 .warp-item { display: flex; justify-content: space-between; align-items: center; font-size: 16px; background: linear-gradient(#a06bd0, #6a3fb0); color: #f0e6ff; border-color: #4a2a80; padding: 12px 16px; }
 .warp-item span:last-child { color: #ffe9b0; font-size: 14px; }
