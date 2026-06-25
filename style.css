@@ -376,6 +376,8 @@ html, body {
 .btn-suspend { background: var(--panel-light); border-color: var(--border); color: var(--text); }
 .btn-resume { background: linear-gradient(#6db6e0, #3a7fb0); color: #042032; border-color: #2a6088; font-weight: bold; box-shadow: 0 4px 0 #234a66; }
 .btn-resume:active { box-shadow: 0 1px 0 #234a66; }
+.btn-warp { font-size: 14px; padding: 9px 16px; background: linear-gradient(#a06bd0, #6a3fb0); color: #f0e6ff; border-color: #4a2a80; font-weight: bold; }
+.btn-warp:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
 
 /* Result */
 .result-title { font-size: 40px; margin: 0; color: var(--danger); text-shadow: 2px 2px 0 #000; letter-spacing: 2px; }

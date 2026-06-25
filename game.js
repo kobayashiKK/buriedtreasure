@@ -21,7 +21,7 @@
     weaponPlus: $("weapon-plus"), armorPlus: $("armor-plus"),
     ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"), rankTitle: $("rank-title"),
     btnStart: $("btn-start"), btnReset: $("btn-reset"), btnDex: $("btn-dex"),
-    btnResume: $("btn-resume"), resumeFloor: $("resume-floor"), btnSuspend: $("btn-suspend"),
+    btnResume: $("btn-resume"), resumeFloor: $("resume-floor"), btnSuspend: $("btn-suspend"), btnWarp: $("btn-warp"),
     ovDex: $("ov-dex"), dexGrid: $("dex-grid"), dexCount: $("dex-count"), btnDexClose: $("btn-dex-close"),
     rsRank: $("rs-rank"), rsNewtitle: $("rs-newtitle"), rsNewtitleName: $("rs-newtitle-name"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
@@ -1205,26 +1205,42 @@
   // ============================================================
   //  Start / restart
   // ============================================================
-  function startGame() {
+  function startGame(warpDepth) {
     clearRun(); // 新規プレイは中断データを破棄
     rows = {};
     for (const k in enemyCache) delete enemyCache[k];
     for (const k in bossCache) delete bossCache[k];
     player = freshPlayer();
-    ensureRow(0);
-    // open up a starting hole below
-    setTile(1, player.c, "dirt");
-    campOpenedAt = -1;
+    pendingAwaken = null;
+    const d = warpDepth | 0;
+    if (d > 0) { player.r = d; player.depthMax = d; }
+    ensureRow(d > 0 ? d : 0);
+    if (d === 0) setTile(1, player.c, "dirt"); // 地表に掘る穴
+    campOpenedAt = (d > 0 ? d : -1);
     lastBiomeName = biomeFor(player.r) ? biomeFor(player.r).name : null;
     floaters = [];
-    anim = { fromR: 0, fromC: player.c, t: 1, dur: 0.13 };
-    camRow = 0;
+    anim = { fromR: player.r, fromC: player.c, t: 1, dur: 0.13 };
+    camRow = player.r;
     state = "explore";
     show(el.ovTitle, false);
     show(el.ovResult, false);
     show(el.ovCombat, false);
     show(el.ovCamp, false);
     updateHUD();
+    if (d > 0) setTimeout(openCamp, 200); // ワープ先の脱出ポイントを開く
+  }
+
+  // ---- ワープ ----
+  function warpTarget() { return Math.floor((profile.deepest | 0) / CAMP_INTERVAL) * CAMP_INTERVAL; }
+  function warpCost(d) { return d * 15; }
+  function canWarp() { return warpTarget() >= 16; }
+  function warpStart() {
+    const target = warpTarget();
+    const cost = warpCost(target);
+    if (target < 16 || profile.bank < cost) return;
+    profile.bank -= cost;
+    persistProfile();
+    startGame(target);
   }
 
   // ---- 中断 / 再開 ----
@@ -1312,6 +1328,10 @@
   el.btnDexClose.addEventListener("click", closeDex);
   el.btnResume.addEventListener("click", resumeRun);
   el.btnSuspend.addEventListener("click", suspendGame);
+  el.btnWarp.addEventListener("click", () => {
+    const target = warpTarget(), cost = warpCost(target);
+    if (confirm(`貯金 ${cost}G を払って B${target}F へワープしますか？\n（着いたら金庫から引き出して装備を整えよう）`)) warpStart();
+  });
   el.btnAttack.addEventListener("click", playerAttack);
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
@@ -1376,6 +1396,16 @@
       show(el.btnResume, true);
     } else {
       show(el.btnResume, false);
+    }
+    // ワープボタン（到達済みの脱出ポイントへ）
+    if (canWarp()) {
+      const target = warpTarget(), cost = warpCost(target);
+      const ok = profile.bank >= cost;
+      el.btnWarp.innerHTML = `🌀 B${target}Fへワープ（${cost}G）`;
+      el.btnWarp.disabled = !ok;
+      show(el.btnWarp, true);
+    } else {
+      show(el.btnWarp, false);
     }
   }
 
