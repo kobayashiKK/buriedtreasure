@@ -95,21 +95,22 @@
     return BOSS_WEAPON_BASE + 2;                 // 滅びの竜剣
   }
 
-  // ---- お供（なかま）：戦闘で一緒に攻撃する ----
+  // ---- お供（なかま）：戦闘で一緒に攻撃／支援する ----
+  // power=追加攻撃, heal=毎攻撃の回復, buff=自分の攻撃倍率, guard=戦闘ごと1回みがわり
   const COMPANIONS = [
-    { name: "こいぬ",     emoji: "🐶", power: 5,  cost: 300 },
-    { name: "ねこ",       emoji: "🐱", power: 8,  cost: 800 },
-    { name: "たか",       emoji: "🦅", power: 13, cost: 1800 },
-    { name: "おおかみ",   emoji: "🐺", power: 21, cost: 4200 },
-    { name: "くま",       emoji: "🐻", power: 33, cost: 9000 },
-    { name: "りゅうの子", emoji: "🐲", power: 52, cost: 21000 },
+    { name: "こいぬ",       emoji: "🐶", power: 5,  cost: 300,   desc: "攻撃 +5" },
+    { name: "いやしねこ",   emoji: "🐱", power: 0,  cost: 800,   heal: 4,    desc: "攻撃のたびHP +4" },
+    { name: "たか",         emoji: "🦅", power: 14, cost: 1800,  desc: "攻撃 +14" },
+    { name: "かぜおおかみ", emoji: "🐺", power: 6,  cost: 4200,  buff: 0.2,  desc: "攻撃 +6・自分の攻撃力 +20%" },
+    { name: "まもりぐま",   emoji: "🐻", power: 12, cost: 9000,  guard: true, desc: "攻撃 +12・戦闘ごと1回みがわり" },
+    { name: "りゅうの子",   emoji: "🐲", power: 45, cost: 21000, heal: 3,    desc: "攻撃 +45・攻撃のたびHP +3" },
   ];
 
   // ---- Enemy pools by depth tier (やさしい見た目のマイルドな魔物) ----
   const ENEMY_TIERS = [
     { until: 8,  list: [["スライム","🟢"],["ぷちうさぎ","🐰"],["おおねずみ","🐭"],["ひよこどり","🐤"]] },
     { until: 16, list: [["スライムベス","🔵"],["かえる兵","🐸"],["こねこマージ","🐱"],["ことり","🐦"]] },
-    { until: 28, list: [["おばけ","👻"],["きつねび","🦊"],["ホイミん","🐡"],["ぺんぎん兵","🐧"]] },
+    { until: 28, list: [["おばけ","👻"],["きつねび","🦊"],["いわトカゲ","🦎"],["どうくつコウモリ","🦇"]] },
     { until: 44, list: [["ゴーレム","🤖"],["くまナイト","🐻"],["ふくろう卿","🦉"],["ぶたメイジ","🐷"]] },
     { until: 64, list: [["こりゅう","🐲"],["ゆきだるま","⛄"],["かぼちゃ魔人","🎃"],["インベーダー","👾"]] },
     { until: Infinity, list: [["りゅうおう","🐉"],["まおうさま","🦹"],["ユニコーン","🦄"],["ぬし","🐳"],
@@ -159,7 +160,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, comp: [] };
+             weaponPlus: [], armorPlus: [], awaken: {}, comp: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -182,6 +183,7 @@
         armorPlus: Array.isArray(p.armorPlus) ? p.armorPlus : [],
         awaken: (p.awaken && typeof p.awaken === "object") ? p.awaken : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
+        bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
     } catch (_) { return defaultProfile(); }
   }
@@ -205,6 +207,7 @@
     profile.armorPlus = player.armorPlus.slice();
     profile.awaken = Object.assign({}, player.awaken);
     profile.comp = player.comp.slice();
+    profile.bossPow = Object.assign({}, player.bossPow);
   }
   // 死亡時：持ち越し装備をリセット（図鑑・貯金は残す）
   function resetGear() {
@@ -228,27 +231,43 @@
              armor: profile.armor, ownedArmor: ownedArmor,
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), comp: profile.comp.slice(),
+             bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
 
   // ---- effective stats with + enhancement / 覚醒 ----
   function wStep(i) { return Math.max(2, Math.round(WEAPONS[i].power * 0.12)); }
   function aStep(i) { return Math.max(1, Math.round((ARMOR[i].def || 1) * 0.18)); }
+  // ボス武器はドロップ時に決まる威力(player.bossPow)を持つ
+  function rawPower(i) {
+    return WEAPONS[i].boss ? ((player.bossPow && player.bossPow[i]) || WEAPONS[i].power) : WEAPONS[i].power;
+  }
   function strongestOwnedPower() {
     let m = 0;
-    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i]) m = Math.max(m, WEAPONS[i].power);
+    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i]) m = Math.max(m, rawPower(i));
     return m;
   }
   function weaponEffect(i) { return (player.awaken && player.awaken[i]) || null; }
-  // 覚醒した武器は「購入済み最強武器の0.8倍」の威力になる
+  // 覚醒した武器は「所持最強武器の0.8倍」の威力になる。ボス武器は固有威力
   function weaponBase(i) {
+    if (WEAPONS[i].boss) return rawPower(i);
     if (weaponEffect(i)) return Math.max(WEAPONS[i].power, Math.round(0.8 * strongestOwnedPower()));
     return WEAPONS[i].power;
   }
   function weaponPower() {
     const i = player.weapon;
-    return weaponBase(i) + (player.weaponPlus[i] || 0) * wStep(i);
+    const base = weaponBase(i) + (player.weaponPlus[i] || 0) * wStep(i);
+    return Math.max(1, Math.round(base * (1 + companionBuff())));
   }
+  // ボス武器の威力 = そのフロアまで敵を全員倒した想定の金で買える店武器 ×1.5
+  function affordableWeaponPower(depth) {
+    let g = 0;
+    for (let d = 1; d <= depth; d++) g += COLS * Math.min(0.28, 0.06 + d * 0.012) * (40 + 14.5 * d);
+    let pow = WEAPONS[0].power;
+    for (let i = 0; i < WEAPONS.length; i++) if (!WEAPONS[i].boss && WEAPONS[i].cost <= g) pow = Math.max(pow, WEAPONS[i].power);
+    return pow;
+  }
+  function bossDropPower(depth) { return Math.round(affordableWeaponPower(depth) * 1.5); }
   function armorDef() {
     const i = player.armor;
     return ARMOR[i].def + (player.armorPlus[i] || 0) * aStep(i);
@@ -308,8 +327,8 @@
       }
       // guarantee at least one non-rock so the floor is always passable
       if (tiles.every((t) => t === "rock")) tiles[(Math.random() * COLS) | 0] = "dirt";
-      // ボスは端寄りの列に配置（中央を通れば回避できる）
-      if (r % BOSS_INTERVAL === 0) {
+      // ボスは端寄りの列に配置（中央を通れば回避できる）。B64までは出現を半分に
+      if (r % BOSS_INTERVAL === 0 && (r > 64 || Math.random() < 0.5)) {
         const edges = [0, 1, COLS - 2, COLS - 1];
         tiles[edges[(Math.random() * edges.length) | 0]] = "boss";
       }
@@ -688,7 +707,7 @@
         ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
         : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
       drop: isBoss ? bossWeaponIndex(depth) : -1,
-      burn: 0, freeze: 0,
+      burn: 0, freeze: 0, guardUsed: false,
       busy: false,
     };
     state = "combat";
@@ -754,6 +773,13 @@
         logCombat(`🐾 なかまの攻撃！ <span class="dmg">${ct}</span> のダメージ！`);
       }
     }
+    // お供の回復
+    const ch = companionHeal();
+    if (ch > 0 && player.hp < player.maxHp) {
+      player.hp = Math.min(player.maxHp, player.hp + ch);
+      logCombat(`🐾 なかまの回復 <span class="awk">HP+${ch}</span>`);
+      updateHUD();
+    }
     updateEnemyHp();
     sfx("hit");
 
@@ -768,9 +794,23 @@
   function companionDamage() {
     let total = 0;
     for (let i = 0; i < COMPANIONS.length; i++) {
-      if (player.comp[i]) total += Math.max(1, Math.round(COMPANIONS[i].power * (0.8 + Math.random() * 0.4)));
+      if (player.comp[i] && COMPANIONS[i].power) total += Math.max(1, Math.round(COMPANIONS[i].power * (0.8 + Math.random() * 0.4)));
     }
     return total;
+  }
+  function companionHeal() {
+    let h = 0;
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) h += COMPANIONS[i].heal || 0;
+    return h;
+  }
+  function companionBuff() {
+    let b = 0;
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) b += COMPANIONS[i].buff || 0;
+    return b;
+  }
+  function hasGuard() {
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i] && COMPANIONS[i].guard) return true;
+    return false;
   }
   function renderCombatPets() {
     const owned = COMPANIONS.filter((c, i) => player.comp[i]);
@@ -801,7 +841,7 @@
     sfx("hurt");
     if (player.hp <= 0) {
       player.hp = 0; updateHUD();
-      if (!tryRevive()) { setTimeout(gameOver, 500); return; }
+      if (!tryGuard() && !tryRevive()) { setTimeout(gameOver, 500); return; }
     }
     // 火傷：敵の攻撃後にダメージ
     if (combat.burn > 0) {
@@ -825,6 +865,17 @@
     return true;
   }
 
+  // お供「まもりぐま」：戦闘ごとに1回みがわり
+  function tryGuard() {
+    if (!hasGuard() || combat.guardUsed) return false;
+    combat.guardUsed = true;
+    player.hp = Math.max(1, Math.round(player.maxHp * 0.3));
+    updateHUD();
+    logCombat(`<span class="awk">🐻 まもりぐま</span> がみがわりになった！`);
+    sfx("heal");
+    return true;
+  }
+
   function winCombat() {
     let reward = combat.reward;
     const x2 = weaponEffect(player.weapon) === "goldx2";
@@ -834,13 +885,15 @@
     el.enemyHpBar.style.width = "0%";
     el.enemyHpText.textContent = "0/" + combat.maxHp;
     logCombat(`${combat.name} をたおした！ <span class="dmg">💰+${reward}G</span>${x2 ? ' <span class="awk">金運2倍!</span>' : ""} を手に入れた！`);
-    // ボスは専用武器をドロップ
+    // ボスは専用武器をドロップ（威力はフロアに応じて決定／自動装備はしない）
     if (combat.isBoss && combat.drop >= 0) {
       const di = combat.drop;
-      const newly = !player.owned[di];
-      player.owned[di] = true;
-      player.weapon = di; // 手に入れた専用武器を装備
-      logCombat(`<span class="awk">⚔️ ${WEAPONS[di].name}</span> を${newly ? "手に入れて装備した！" : "またドロップした！"}`);
+      const pow = bossDropPower(combat.r);
+      player.bossPow = player.bossPow || {};
+      const upgraded = pow > (player.bossPow[di] || 0);
+      player.bossPow[di] = Math.max(player.bossPow[di] || 0, pow);
+      player.owned[di] = true; // 装備は変更しない（脱出ポイントで付け替え可）
+      logCombat(`<span class="awk">⚔️ ${WEAPONS[di].name}（攻撃${player.bossPow[di]}）</span> を手に入れた！${upgraded ? "" : "（威力は据え置き）"}`);
       el.enemyEmoji.classList.remove("boss");
     }
     addFloater(combat.r, combat.c, "+" + reward + "G", "#f6c453");
@@ -1026,7 +1079,7 @@
         const eff = weaponEffect(i);
         const tag = w.boss ? "👑" : "";
         if (eff) return `${tag}⭐攻撃力 ${weaponBase(i)}・${EFFECTS[eff].emoji}${EFFECTS[eff].name}`;
-        return `${tag}攻撃力 ${w.power}`;
+        return `${tag}攻撃力 ${weaponBase(i)}`;
       },
       (i, owned) => {
         const w = WEAPONS[i];
@@ -1053,10 +1106,10 @@
       canAfford(acost), false, () => { pay(acost); player.armorPlus[ai] = alv + 1; afterPurchase(); }));
 
     // --- companions (なかま) ---
-    el.shop.appendChild(shopHeader("🐾 なかま（戦闘で一緒に攻撃）"));
+    el.shop.appendChild(shopHeader("🐾 なかま（戦闘で攻撃・回復・支援）"));
     COMPANIONS.forEach((c, i) => {
       const owned = !!player.comp[i];
-      const row = shopRow(c.emoji, c.name, `攻撃力 +${c.power}`, c.cost,
+      const row = shopRow(c.emoji, c.name, c.desc, c.cost,
         !owned && canAfford(c.cost), owned, () => {
           if (player.comp[i]) return;
           pay(c.cost); player.comp[i] = true; afterPurchase();
