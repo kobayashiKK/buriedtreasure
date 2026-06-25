@@ -76,6 +76,9 @@
     lifesteal: { name: "吸収", emoji: "💞", desc: "攻撃するたびにHP回復" },
     regen:     { name: "再生", emoji: "🌿", desc: "1歩進むたびにHP回復" },
     goldx2:    { name: "金運", emoji: "💰", desc: "敵を倒した報酬が2倍" },
+    burn:      { name: "火傷", emoji: "🔥", desc: "敵の攻撃後にダメージを与え続ける" },
+    freeze:    { name: "凍結", emoji: "❄️", desc: "一定確率で敵を数ターン凍結させる" },
+    revive:    { name: "生命の神秘", emoji: "💚", desc: "力尽きても一度だけ復活する" },
   };
   const EFFECT_KEYS = Object.keys(EFFECTS);
 
@@ -203,7 +206,7 @@
              armor: profile.armor, ownedArmor: ownedArmor,
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), comp: profile.comp.slice(),
-             campCount: 0, depthMax: 0 };
+             reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
 
   // ---- effective stats with + enhancement / 覚醒 ----
@@ -634,6 +637,7 @@
         ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
         : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
       drop: isBoss ? bossWeaponIndex(depth) : -1,
+      burn: 0, freeze: 0,
       busy: false,
     };
     state = "combat";
@@ -680,6 +684,17 @@
       logCombat(`<span class="awk">💞 吸収</span> HP+${heal}`);
       updateHUD();
     }
+    // 覚醒「火傷」：以後、敵の攻撃後にダメージ
+    if (eff === "burn" && combat.hp > 0) {
+      const wasBurning = combat.burn > 0;
+      combat.burn = Math.max(3, Math.round(weaponPower() * 0.25));
+      if (!wasBurning) logCombat(`<span class="awk">🔥 火傷</span> を負わせた！`);
+    }
+    // 覚醒「凍結」：一定確率で数ターン凍結
+    if (eff === "freeze" && combat.hp > 0 && Math.random() < 0.3) {
+      combat.freeze = Math.max(combat.freeze, 2);
+      logCombat(`<span class="awk">❄️ 凍結</span>！ ${combat.name} は動けない`);
+    }
     // お供（なかま）も一緒に攻撃
     if (combat.hp > 0) {
       const ct = companionDamage();
@@ -717,6 +732,13 @@
   }
 
   function enemyAttack(done) {
+    // 凍結中は攻撃できない
+    if (combat.freeze > 0) {
+      combat.freeze--;
+      logCombat(`<span class="awk">❄️</span> ${combat.name} は凍結して動けない！（残り${combat.freeze}）`);
+      done && done();
+      return;
+    }
     const raw = Math.max(1, Math.round(combat.atk * (0.8 + Math.random() * 0.4)));
     const def = armorDef();
     const dmg = Math.max(1, raw - def);
@@ -726,8 +748,30 @@
     logCombat(`${combat.name} の こうげき！ <span class="hurt">${dmg}</span> ダメージ${reduced}`);
     updateHUD();
     sfx("hurt");
-    if (player.hp <= 0) { player.hp = 0; updateHUD(); setTimeout(gameOver, 500); return; }
+    if (player.hp <= 0) {
+      player.hp = 0; updateHUD();
+      if (!tryRevive()) { setTimeout(gameOver, 500); return; }
+    }
+    // 火傷：敵の攻撃後にダメージ
+    if (combat.burn > 0) {
+      combat.hp -= combat.burn;
+      logCombat(`<span class="awk">🔥 火傷</span> ${combat.name} に <span class="dmg">${combat.burn}</span> のダメージ`);
+      updateEnemyHp();
+      if (combat.hp <= 0) { setTimeout(() => winCombat(), 450); return; }
+    }
     done && done();
+  }
+
+  // 生命の神秘：装備中の武器ごとに一回だけ復活
+  function tryRevive() {
+    if (weaponEffect(player.weapon) !== "revive") return false;
+    if (player.reviveUsed[player.weapon]) return false;
+    player.reviveUsed[player.weapon] = true;
+    player.hp = Math.max(1, Math.round(player.maxHp * 0.5));
+    updateHUD();
+    logCombat(`<span class="awk">💚 生命の神秘！</span> ${WEAPONS[player.weapon].name} の力で復活した！`);
+    sfx("heal");
+    return true;
   }
 
   function winCombat() {
