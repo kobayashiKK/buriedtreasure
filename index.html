@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=20260624s" />
+<link rel="stylesheet" href="style.css?v=20260624t" />
 </head>
 <body>
   <div id="app">
@@ -105,6 +105,14 @@
         <button class="btn btn-primary big" id="btn-retry">もう一度</button>
       </div>
 
+      <!-- Warp overlay -->
+      <div class="overlay overlay-panel scroll-area" id="ov-warp" hidden>
+        <h2 class="camp-title">🌀 ワープ先をえらぶ</h2>
+        <p class="camp-sub">貯金を払って到達済みの脱出ポイントへ。着いたら金庫で装備を整えよう。</p>
+        <div class="warp-list" id="warp-list"></div>
+        <button class="btn btn-dig" id="btn-warp-close">とじる</button>
+      </div>
+
       <!-- Monster dex overlay -->
       <div class="overlay overlay-panel scroll-area" id="ov-dex" hidden>
         <h2 class="camp-title">📖 まもの図鑑 <span id="dex-count" class="dex-count">0/0</span></h2>
@@ -124,6 +132,6 @@
     </footer>
   </div>
 
-  <script src="game.js?v=20260624s"></script>
+  <script src="game.js?v=20260624t"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@
     ovTitle: $("ov-title"), bestTitle: $("best-title"), deepestTitle: $("deepest-title"), rankTitle: $("rank-title"),
     btnStart: $("btn-start"), btnReset: $("btn-reset"), btnDex: $("btn-dex"),
     btnResume: $("btn-resume"), resumeFloor: $("resume-floor"), btnSuspend: $("btn-suspend"), btnWarp: $("btn-warp"),
+    ovWarp: $("ov-warp"), warpList: $("warp-list"), btnWarpClose: $("btn-warp-close"),
     ovDex: $("ov-dex"), dexGrid: $("dex-grid"), dexCount: $("dex-count"), btnDexClose: $("btn-dex-close"),
     rsRank: $("rs-rank"), rsNewtitle: $("rs-newtitle"), rsNewtitleName: $("rs-newtitle-name"),
     ovCombat: $("ov-combat"), enemyEmoji: $("enemy-emoji"), enemyName: $("enemy-name"),
@@ -1229,14 +1230,35 @@
   function warpTarget() { return Math.floor((profile.deepest | 0) / CAMP_INTERVAL) * CAMP_INTERVAL; }
   function warpCost(d) { return d * 15; }
   function canWarp() { return warpTarget() >= 16; }
-  function warpStart() {
-    const target = warpTarget();
+  function warpStart(target) {
+    target = target | 0;
     const cost = warpCost(target);
-    if (target < 16 || profile.bank < cost) return;
+    if (target < CAMP_INTERVAL || profile.bank < cost) return;
     profile.bank -= cost;
     persistProfile();
     startGame(target);
   }
+  function openWarp() {
+    const maxD = warpTarget();
+    el.warpList.innerHTML = "";
+    for (let d = maxD; d >= CAMP_INTERVAL; d -= CAMP_INTERVAL) {
+      const cost = warpCost(d);
+      const ok = profile.bank >= cost;
+      const b = document.createElement("button");
+      b.className = "btn warp-item";
+      b.innerHTML = `<span>B${d}F</span><span>${cost}G</span>`;
+      b.disabled = !ok;
+      const dd = d;
+      b.onclick = () => {
+        if (confirm(`貯金 ${cost}G を払って B${dd}F へワープしますか？\n（着いたら金庫から引き出して装備を整えよう）`)) {
+          closeWarp(); warpStart(dd);
+        }
+      };
+      el.warpList.appendChild(b);
+    }
+    show(el.ovWarp, true);
+  }
+  function closeWarp() { show(el.ovWarp, false); }
 
   // ---- 中断 / 再開 ----
   function hasRun() { return !!localStorage.getItem(RUN_KEY); }
@@ -1323,10 +1345,8 @@
   el.btnDexClose.addEventListener("click", closeDex);
   el.btnResume.addEventListener("click", resumeRun);
   el.btnSuspend.addEventListener("click", suspendGame);
-  el.btnWarp.addEventListener("click", () => {
-    const target = warpTarget(), cost = warpCost(target);
-    if (confirm(`貯金 ${cost}G を払って B${target}F へワープしますか？\n（着いたら金庫から引き出して装備を整えよう）`)) warpStart();
-  });
+  el.btnWarp.addEventListener("click", openWarp);
+  el.btnWarpClose.addEventListener("click", closeWarp);
   el.btnAttack.addEventListener("click", playerAttack);
   el.btnFlee.addEventListener("click", flee);
   el.btnEscape.addEventListener("click", escapeGame);
@@ -1392,12 +1412,10 @@
     } else {
       show(el.btnResume, false);
     }
-    // ワープボタン（到達済みの脱出ポイントへ）
+    // ワープボタン（到達済みの脱出ポイントを選んで開始）
     if (canWarp()) {
-      const target = warpTarget(), cost = warpCost(target);
-      const ok = profile.bank >= cost;
-      el.btnWarp.innerHTML = `🌀 B${target}Fへワープ（${cost}G）`;
-      el.btnWarp.disabled = !ok;
+      el.btnWarp.innerHTML = `🌀 ワープ（〜B${warpTarget()}F）`;
+      el.btnWarp.disabled = profile.bank < warpCost(CAMP_INTERVAL);
       show(el.btnWarp, true);
     } else {
       show(el.btnWarp, false);
