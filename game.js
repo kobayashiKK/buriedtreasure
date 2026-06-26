@@ -104,16 +104,40 @@
     return BOSS_WEAPON_BASE + 2;                 // 滅びの竜剣
   }
 
-  // ---- お供（なかま）：戦闘で一緒に攻撃／支援する ----
-  // power=追加攻撃, heal=毎攻撃の回復, buff=自分の攻撃倍率, guard=戦闘ごと1回みがわり
+  // ---- お供（なかま）：レベルで成長し、10レベルごとに進化（見た目変化） ----
+  // evo: 進化段階[名前,絵文字], atk/heal/buff = Lv1の値, *G = レベルごとの伸び
   const COMPANIONS = [
-    { name: "こいぬ",       emoji: "🐶", power: 5,  cost: 300,   desc: "攻撃 +5" },
-    { name: "いやしねこ",   emoji: "🐱", power: 0,  cost: 800,   heal: 4,    desc: "攻撃のたびHP +4" },
-    { name: "たか",         emoji: "🦅", power: 14, cost: 1800,  desc: "攻撃 +14" },
-    { name: "かぜおおかみ", emoji: "🐺", power: 6,  cost: 4200,  buff: 0.2,  desc: "攻撃 +6・自分の攻撃力 +20%" },
-    { name: "まもりぐま",   emoji: "🐻", power: 12, cost: 9000,  guard: true, desc: "攻撃 +12・戦闘ごと1回みがわり" },
-    { name: "りゅうの子",   emoji: "🐲", power: 45, cost: 21000, heal: 3,    desc: "攻撃 +45・攻撃のたびHP +3" },
+    { evo: [["こいぬ","🐶"],["ばんけん","🐕"],["おおかみ","🐺"]], cost: 300,
+      atk: 5, atkG: 3, heal: 0, healG: 0, buff: 0, buffG: 0, guard: false },
+    { evo: [["こねこ","🐱"],["いやしねこ","🐈"],["せいじゅう","🦁"]], cost: 800,
+      atk: 0, atkG: 0, heal: 4, healG: 1, buff: 0, buffG: 0, guard: false },
+    { evo: [["ひな","🐤"],["たか","🦅"],["ひりゅう","🐉"]], cost: 1800,
+      atk: 14, atkG: 6, heal: 0, healG: 0, buff: 0, buffG: 0, guard: false },
+    { evo: [["かぜのせい","🍃"],["ふうせい","🦋"],["あらしのぬし","🌀"]], cost: 4200,
+      atk: 6, atkG: 2, heal: 0, healG: 0, buff: 0.2, buffG: 0.03, guard: false },
+    { evo: [["こぐま","🐻"],["バイソン","🦬"],["マンモス","🦣"]], cost: 9000,
+      atk: 12, atkG: 5, heal: 0, healG: 0, buff: 0, buffG: 0, guard: true },
+    { evo: [["たまご","🥚"],["りゅうの子","🐲"],["せいりゅう","🐉"]], cost: 21000,
+      atk: 45, atkG: 12, heal: 3, healG: 1, buff: 0, buffG: 0, guard: false },
   ];
+  function compLevel(i) { return (player.compLv && player.compLv[i]) || (player.comp[i] ? 1 : 0); }
+  function compStage(i) { return Math.min(COMPANIONS[i].evo.length - 1, Math.floor(compLevel(i) / 10)); }
+  function compForm(i) { return COMPANIONS[i].evo[compStage(i)]; }
+  function compAtk(i) { const L = compLevel(i); return L ? COMPANIONS[i].atk + (L - 1) * COMPANIONS[i].atkG : 0; }
+  function compHealVal(i) { const L = compLevel(i); return L ? COMPANIONS[i].heal + (L - 1) * COMPANIONS[i].healG : 0; }
+  function compBuffVal(i) { const L = compLevel(i); return L ? COMPANIONS[i].buff + (L - 1) * COMPANIONS[i].buffG : 0; }
+  function compUpCost(i) { return Math.round((COMPANIONS[i].cost * 0.35 + 80) * Math.pow(compLevel(i) + 1, 1.4)); }
+  function compDescAt(i, L) {
+    const c = COMPANIONS[i], parts = [];
+    const atk = L ? c.atk + (L - 1) * c.atkG : 0;
+    const heal = L ? c.heal + (L - 1) * c.healG : 0;
+    const buff = L ? c.buff + (L - 1) * c.buffG : 0;
+    if (atk) parts.push(`攻撃+${atk}`);
+    if (heal) parts.push(`回復+${heal}`);
+    if (buff) parts.push(`攻撃力+${Math.round(buff * 100)}%`);
+    if (c.guard) parts.push("戦闘1回みがわり");
+    return parts.join("・");
+  }
 
   // ---- Enemy pools by depth tier (やさしい見た目のマイルドな魔物) ----
   const ENEMY_TIERS = [
@@ -169,7 +193,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], bossPow: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], compLv: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -194,6 +218,7 @@
         armorAwaken: (p.armorAwaken && typeof p.armorAwaken === "object") ? p.armorAwaken : {},
         efx: (p.efx && typeof p.efx === "object") ? p.efx : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
+        compLv: Array.isArray(p.compLv) ? p.compLv : [],
         bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
     } catch (_) { return defaultProfile(); }
@@ -220,6 +245,7 @@
     profile.armorAwaken = Object.assign({}, player.armorAwaken);
     profile.efx = JSON.parse(JSON.stringify(player.efx || {}));
     profile.comp = player.comp.slice();
+    profile.compLv = player.compLv.slice();
     profile.bossPow = Object.assign({}, player.bossPow);
   }
   // 死亡時：持ち越し装備をリセット（図鑑・貯金は残す）
@@ -245,7 +271,7 @@
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), armorAwaken: Object.assign({}, profile.armorAwaken),
              efx: JSON.parse(JSON.stringify(profile.efx || {})),
-             comp: profile.comp.slice(), bossPow: Object.assign({}, profile.bossPow),
+             comp: profile.comp.slice(), compLv: profile.compLv.slice(), bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
 
@@ -852,18 +878,19 @@
   function companionDamage() {
     let total = 0;
     for (let i = 0; i < COMPANIONS.length; i++) {
-      if (player.comp[i] && COMPANIONS[i].power) total += Math.max(1, Math.round(COMPANIONS[i].power * (0.8 + Math.random() * 0.4)));
+      const a = compAtk(i);
+      if (player.comp[i] && a) total += Math.max(1, Math.round(a * (0.8 + Math.random() * 0.4)));
     }
     return total;
   }
   function companionHeal() {
     let h = 0;
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) h += COMPANIONS[i].heal || 0;
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) h += compHealVal(i);
     return h;
   }
   function companionBuff() {
     let b = 0;
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) b += COMPANIONS[i].buff || 0;
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) b += compBuffVal(i);
     return b;
   }
   function hasGuard() {
@@ -871,9 +898,10 @@
     return false;
   }
   function renderCombatPets() {
-    const owned = COMPANIONS.filter((c, i) => player.comp[i]);
-    if (owned.length) {
-      el.combatPets.innerHTML = "なかま " + owned.map((c) => c.emoji).join("");
+    const emos = [];
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) emos.push(compForm(i)[1]);
+    if (emos.length) {
+      el.combatPets.innerHTML = "なかま " + emos.join("");
       show(el.combatPets, true);
     } else {
       show(el.combatPets, false);
@@ -1199,21 +1227,77 @@
       canAfford(acost), false, () => { pay(acost); player.armorPlus[ai] = alv + 1; afterPurchase(); }));
 
     // --- companions (なかま) ---
-    el.shop.appendChild(shopHeader("🐾 なかま（戦闘で攻撃・回復・支援）"));
+    el.shop.appendChild(shopHeader("🐾 なかま（強化で成長・10Lvで進化）"));
     COMPANIONS.forEach((c, i) => {
-      const owned = !!player.comp[i];
-      const row = shopRow(c.emoji, c.name, c.desc, c.cost,
-        !owned && canAfford(c.cost), owned, () => {
-          if (player.comp[i]) return;
-          pay(c.cost); player.comp[i] = true; afterPurchase();
-        });
-      if (owned) {
-        const buy = row.querySelector(".si-buy");
-        row.classList.add("owned");
-        buy.textContent = "なかま"; buy.classList.add("equipped"); buy.disabled = true;
+      if (!player.comp[i]) {
+        el.shop.appendChild(shopRow(c.evo[0][1], c.evo[0][0], `Lv1 ${compDescAt(i, 1)}`, c.cost,
+          canAfford(c.cost), false, () => { pay(c.cost); player.comp[i] = true; player.compLv[i] = 1; afterPurchase(); }));
+      } else {
+        const L = compLevel(i), form = compForm(i), up = compUpCost(i);
+        const soon = ((L + 1) % 10 === 0) ? "（次で進化！）" : "";
+        const row = shopRow(form[1], `${form[0]} Lv${L}`, `${compDescAt(i, L)}${soon}`, up,
+          canAfford(up), false, () => {
+            pay(up); player.compLv[i] = L + 1; player.comp[i] = true;
+            if ((L + 1) % 10 === 0) {
+              const nf = compForm(i);
+              el.awakenNotice.innerHTML = `✨ なかまが <b>${nf[0]} ${nf[1]}</b> に進化した！`;
+              show(el.awakenNotice, true); sfx("win");
+            }
+            afterPurchase();
+          });
+        row.querySelector(".si-buy").textContent = "強化 " + up + "G";
+        el.shop.appendChild(row);
       }
-      el.shop.appendChild(row);
     });
+
+    // --- reroll (効果の振り直し) ---
+    const wfx = weaponFx(player.weapon), aef = armorEffect(player.armor);
+    if (wfx.length || aef) {
+      el.shop.appendChild(shopHeader("🎲 効果の振り直し"));
+      if (wfx.length) {
+        const cost = 8000 * wfx.length;
+        el.shop.appendChild(shopRow("⚔️", `${WEAPONS[player.weapon].name} の効果を振り直す`,
+          `現在: ${wfx.map((k) => EFFECTS[k].emoji).join("")}`, cost, canAfford(cost), false, () => {
+            if (!confirm("武器の特殊効果をすべて振り直しますか？（今の効果は失われます）")) return;
+            pay(cost); rerollWeaponFx();
+            const nf = weaponFx(player.weapon);
+            el.awakenNotice.innerHTML = `🎲 武器の効果を振り直した！ ${nf.map((k) => EFFECTS[k].emoji + EFFECTS[k].name).join(" ")}`;
+            show(el.awakenNotice, true);
+            afterPurchase();
+          }));
+      }
+      if (aef) {
+        const cost = 8000;
+        el.shop.appendChild(shopRow("🛡️", `${ARMOR[player.armor].name} の効果を振り直す`,
+          `現在: ${ARMOR_EFFECTS[aef].emoji}${ARMOR_EFFECTS[aef].name}`, cost, canAfford(cost), false, () => {
+            if (!confirm("防具の特殊効果を振り直しますか？")) return;
+            pay(cost); rerollArmorFx();
+            const na = armorEffect(player.armor);
+            el.awakenNotice.innerHTML = `🎲 防具の効果を振り直した！ ${ARMOR_EFFECTS[na].emoji}${ARMOR_EFFECTS[na].name}`;
+            show(el.awakenNotice, true);
+            afterPurchase();
+          }));
+      }
+    }
+  }
+
+  function shuffleArr(a) { for (let k = a.length - 1; k > 0; k--) { const j = (Math.random() * (k + 1)) | 0; const t = a[k]; a[k] = a[j]; a[j] = t; } return a; }
+  function rerollWeaponFx() {
+    const i = player.weapon;
+    const hadAwaken = !!(player.awaken && player.awaken[i]);
+    const efxLen = (player.efx && player.efx[i]) ? player.efx[i].length : 0;
+    const count = (hadAwaken ? 1 : 0) + efxLen;
+    if (count === 0) return;
+    const keys = shuffleArr(EFFECT_KEYS.slice()).slice(0, Math.min(count, EFFECT_KEYS.length));
+    let idx = 0;
+    if (hadAwaken) player.awaken[i] = keys[idx++];
+    player.efx = player.efx || {};
+    player.efx[i] = keys.slice(idx);
+  }
+  function rerollArmorFx() {
+    const i = player.armor;
+    if (!(player.armorAwaken && player.armorAwaken[i])) return;
+    player.armorAwaken[i] = ARMOR_EFFECT_KEYS[(Math.random() * ARMOR_EFFECT_KEYS.length) | 0];
   }
 
   // Generic weapon/armor list renderer. visibleFn(i, owned): その行を表示するか
