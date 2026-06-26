@@ -1266,6 +1266,8 @@
         const soon = ((L + 1) % 10 === 0) ? "（次で進化！）" : "";
         const row = shopRow(form[1], `${form[0]} Lv${L}`, `${compDescAt(i, L)}${soon}`, up,
           canAfford(up), false, () => {
+            if (!canAfford(up)) return;
+            player.compLv = player.compLv || [];
             pay(up); player.compLv[i] = L + 1; player.comp[i] = true;
             if ((L + 1) % 10 === 0) {
               const nf = compForm(i);
@@ -1397,13 +1399,13 @@
     const prevDeepest = profile.deepest | 0;
     let lost = 0;
     if (cleared) {
-      // 脱出成功：手持ちも全部持ち帰り、装備も次回へ持ち越す
-      player.banked += player.gold;
+      // 脱出成功：手持ち（マイナスなら0扱い）も持ち帰り、装備も次回へ持ち越す
+      player.banked += Math.max(0, player.gold);
       player.gold = 0;
       saveGear();
     } else {
       // 死亡：手持ちは失い、持ち越し装備もリセット。貯金のみ残る
-      lost = player.gold;
+      lost = Math.max(0, player.gold);
       player.gold = 0;
       resetGear();
     }
@@ -1534,9 +1536,10 @@
   function hasRun() { return !!localStorage.getItem(RUN_KEY); }
   function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (_) {} }
 
-  // 脱出ポイントで中断：ラン状態を保存してタイトルへ
+  // 脱出ポイントで中断：ラン状態＋マップを保存してタイトルへ
   function suspendGame() {
-    try { localStorage.setItem(RUN_KEY, JSON.stringify(player)); } catch (_) {}
+    const data = { p: player, rows: rows, ec: enemyCache, bc: bossCache };
+    try { localStorage.setItem(RUN_KEY, JSON.stringify(data)); } catch (_) {}
     saveMoney();
     show(el.ovCamp, false);
     show(el.ovResult, false);
@@ -1546,20 +1549,37 @@
     show(el.ovTitle, true);
   }
 
-  // タイトルから中断データで再開：中断した階層（脱出ポイント）から
+  // タイトルから中断データで再開：中断した階層・道の状態のまま再開
   function resumeRun() {
-    let snap;
-    try { snap = JSON.parse(localStorage.getItem(RUN_KEY)); } catch (_) { snap = null; }
-    if (!snap) { updateTitle(); return; }
+    let data;
+    try { data = JSON.parse(localStorage.getItem(RUN_KEY)); } catch (_) { data = null; }
+    if (!data) { updateTitle(); return; }
     clearRun(); // 一度きり（消費）
-    player = snap;
+    // 旧形式(player単体) / 新形式({p,rows,ec,bc}) 両対応。欠けたフィールドはfreshPlayerで補完
+    const snap = data.p || data;
+    player = Object.assign(freshPlayer(), snap);
     if (!Array.isArray(player.weaponPlus)) player.weaponPlus = [];
     if (!Array.isArray(player.armorPlus)) player.armorPlus = [];
-    rows = {};
+    if (!Array.isArray(player.comp)) player.comp = [];
+    if (!Array.isArray(player.compLv)) player.compLv = [];
+    if (!Array.isArray(player.pets)) player.pets = [];
+    if (!player.awaken) player.awaken = {};
+    if (!player.armorAwaken) player.armorAwaken = {};
+    if (!player.efx) player.efx = {};
+    if (!player.bossPow) player.bossPow = {};
+    // マップ（掘った道）の復元
     for (const k in enemyCache) delete enemyCache[k];
     for (const k in bossCache) delete bossCache[k];
+    if (data.rows) {
+      rows = data.rows;
+      for (const k in rows) { const r = parseInt(k, 10); if (r > 0 && r % CAMP_INTERVAL === 0) rows[k].isCamp = true; }
+      if (data.ec) Object.assign(enemyCache, data.ec);
+      if (data.bc) Object.assign(bossCache, data.bc);
+    } else {
+      rows = {};
+    }
     ensureRow(player.r);
-    campOpenedAt = -1;
+    campOpenedAt = player.r; // 既にcamp扱い
     lastBiomeName = biomeFor(player.r) ? biomeFor(player.r).name : null;
     floaters = [];
     anim = { fromR: player.r, fromC: player.c, t: 1, dur: 0.13 };
