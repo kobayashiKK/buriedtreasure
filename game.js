@@ -169,7 +169,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, comp: [], bossPow: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -192,6 +192,7 @@
         armorPlus: Array.isArray(p.armorPlus) ? p.armorPlus : [],
         awaken: (p.awaken && typeof p.awaken === "object") ? p.awaken : {},
         armorAwaken: (p.armorAwaken && typeof p.armorAwaken === "object") ? p.armorAwaken : {},
+        efx: (p.efx && typeof p.efx === "object") ? p.efx : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
         bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
@@ -217,6 +218,7 @@
     profile.armorPlus = player.armorPlus.slice();
     profile.awaken = Object.assign({}, player.awaken);
     profile.armorAwaken = Object.assign({}, player.armorAwaken);
+    profile.efx = JSON.parse(JSON.stringify(player.efx || {}));
     profile.comp = player.comp.slice();
     profile.bossPow = Object.assign({}, player.bossPow);
   }
@@ -242,6 +244,7 @@
              armor: profile.armor, ownedArmor: ownedArmor,
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), armorAwaken: Object.assign({}, profile.armorAwaken),
+             efx: JSON.parse(JSON.stringify(profile.efx || {})),
              comp: profile.comp.slice(), bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
@@ -258,7 +261,15 @@
     for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i]) m = Math.max(m, rawPower(i));
     return m;
   }
-  function weaponEffect(i) { return (player.awaken && player.awaken[i]) || null; }
+  function weaponEffect(i) { return (player.awaken && player.awaken[i]) || null; } // 覚醒(0.8倍化)の印
+  // 武器が持つ特殊効果すべて（覚醒 + 強化10ごとに付与）
+  function weaponFx(i) {
+    const arr = [];
+    if (player.awaken && player.awaken[i]) arr.push(player.awaken[i]);
+    if (player.efx && player.efx[i]) for (const e of player.efx[i]) if (!arr.includes(e)) arr.push(e);
+    return arr;
+  }
+  function hasFx(key) { return weaponFx(player.weapon).includes(key); }
   // 覚醒した武器は「所持最強武器の0.8倍」の威力になる。ボス武器は固有威力
   function weaponBase(i) {
     if (WEAPONS[i].boss) return rawPower(i);
@@ -675,7 +686,7 @@
     player.r = nr; player.c = nc;
     if (nr > player.depthMax) player.depthMax = nr;
     // 覚醒「再生」：1歩ごとにHP回復
-    if (weaponEffect(player.weapon) === "regen" && player.hp < player.maxHp) {
+    if (hasFx("regen") && player.hp < player.maxHp) {
       player.hp = Math.min(player.maxHp, player.hp + 1);
     }
     updateHUD();
@@ -716,6 +727,25 @@
     const effect = effectKeys[(Math.random() * effectKeys.length) | 0];
     awakenMap[idx] = effect;
     return { idx, effect };
+  }
+
+  // 強化10回ごと：武器に未所持の特殊効果をひとつ付与
+  function grantEnhanceFx(i) {
+    player.efx = player.efx || {};
+    player.efx[i] = player.efx[i] || [];
+    const have = weaponFx(i);
+    const avail = EFFECT_KEYS.filter((k) => !have.includes(k));
+    if (avail.length === 0) {
+      el.awakenNotice.innerHTML = `🔨 <b>${WEAPONS[i].name}</b> +${player.weaponPlus[i]}：すでに全効果を習得！`;
+      show(el.awakenNotice, true);
+      return;
+    }
+    const key = avail[(Math.random() * avail.length) | 0];
+    player.efx[i].push(key);
+    const ef = EFFECTS[key];
+    el.awakenNotice.innerHTML = `🔨 <b>${WEAPONS[i].name}</b> +${player.weaponPlus[i]}！ 特殊効果 ${ef.emoji}${ef.name}（${ef.desc}）が付与された`;
+    show(el.awakenNotice, true);
+    sfx("win");
   }
 
   // ============================================================
@@ -763,33 +793,33 @@
   function playerAttack() {
     if (state !== "combat" || combat.busy) return;
     combat.busy = true; setCombatButtons(false);
-    const eff = weaponEffect(player.weapon);
+    const fx = weaponFx(player.weapon);
     let dmg = Math.max(1, Math.round(weaponPower() * (0.8 + Math.random() * 0.4)));
     let note = "";
-    if (eff === "instakill" && Math.random() < 0.08) {
+    if (fx.includes("instakill") && Math.random() < 0.08) {
       combat.hp = 0;
       logCombat(`<span class="awk">⚡ 即死！</span> ${combat.name} を一撃で葬った！`);
     } else {
-      if (eff === "crit" && Math.random() < 0.2) { dmg *= 2; note = ` <span class="awk">✨会心!</span>`; }
+      if (fx.includes("crit") && Math.random() < 0.2) { dmg *= 2; note = ` <span class="awk">✨会心!</span>`; }
       combat.hp -= dmg;
       logCombat(`${combat.name} に <span class="dmg">${dmg}</span> のダメージ！${note}`);
     }
     el.enemyEmoji.classList.remove("hit"); void el.enemyEmoji.offsetWidth; el.enemyEmoji.classList.add("hit");
-    // 覚醒「吸収」：攻撃ごとにHP回復
-    if (eff === "lifesteal" && player.hp < player.maxHp) {
+    // 「吸収」：攻撃ごとにHP回復
+    if (fx.includes("lifesteal") && player.hp < player.maxHp) {
       const heal = Math.max(2, Math.round(player.maxHp * 0.05));
       player.hp = Math.min(player.maxHp, player.hp + heal);
       logCombat(`<span class="awk">💞 吸収</span> HP+${heal}`);
       updateHUD();
     }
-    // 覚醒「火傷」：以後、敵の攻撃後にダメージ
-    if (eff === "burn" && combat.hp > 0) {
+    // 「火傷」：以後、敵の攻撃後にダメージ
+    if (fx.includes("burn") && combat.hp > 0) {
       const wasBurning = combat.burn > 0;
       combat.burn = Math.max(3, Math.round(weaponPower() * 0.25));
       if (!wasBurning) logCombat(`<span class="awk">🔥 火傷</span> を負わせた！`);
     }
-    // 覚醒「凍結」：一定確率で数ターン凍結
-    if (eff === "freeze" && combat.hp > 0 && Math.random() < 0.3) {
+    // 「凍結」：一定確率で数ターン凍結
+    if (fx.includes("freeze") && combat.hp > 0 && Math.random() < 0.3) {
       combat.freeze = Math.max(combat.freeze, 2);
       logCombat(`<span class="awk">❄️ 凍結</span>！ ${combat.name} は動けない`);
     }
@@ -905,7 +935,7 @@
 
   // 生命の神秘：装備中の武器ごとに一回だけ復活
   function tryRevive() {
-    if (weaponEffect(player.weapon) !== "revive") return false;
+    if (!weaponFx(player.weapon).includes("revive")) return false;
     if (player.reviveUsed[player.weapon]) return false;
     player.reviveUsed[player.weapon] = true;
     player.hp = Math.max(1, Math.round(player.maxHp * 0.5));
@@ -928,7 +958,7 @@
 
   function winCombat() {
     let reward = combat.reward;
-    const x2 = weaponEffect(player.weapon) === "goldx2";
+    const x2 = weaponFx(player.weapon).includes("goldx2");
     if (x2) reward *= 2;
     player.gold += reward;
     if (!combat.isBoss && !profile.dex.includes(combat.name)) { profile.dex.push(combat.name); persistProfile(); }
@@ -1128,15 +1158,16 @@
       (i) => { player.owned[i] = true; player.weapon = i; },
       (i) => { player.weapon = i; },
       (w, i) => {
-        const eff = weaponEffect(i);
         const tag = w.boss ? "👑" : "";
-        if (eff) return `${tag}⭐攻撃力 ${weaponBase(i)}・${EFFECTS[eff].emoji}${EFFECTS[eff].name}`;
-        return `${tag}攻撃力 ${weaponBase(i)}`;
+        const star = weaponEffect(i) ? "⭐" : "";
+        const fx = weaponFx(i);
+        const fxs = fx.length ? "・" + fx.map((k) => EFFECTS[k].emoji + EFFECTS[k].name).join(" ") : "";
+        return `${tag}${star}攻撃力 ${weaponBase(i)}${fxs}`;
       },
       (i, owned) => {
         const w = WEAPONS[i];
         if (w.boss) return owned;              // ボス専用武器は入手時のみ表示
-        if (i === 0) return owned && !!weaponEffect(0); // こん棒は覚醒時のみ
+        if (i === 0) return owned && weaponFx(0).length > 0; // こん棒は効果がある時のみ
         return true;
       });
 
@@ -1156,8 +1187,13 @@
     // --- enhancement (無限の金の使い道) ---
     el.shop.appendChild(shopHeader("🔨 強化（装備中のものを+強化）"));
     const wi = player.weapon, wlv = player.weaponPlus[wi] || 0, wcost = enhanceCostW(wi), wp = weaponPower();
-    el.shop.appendChild(shopRow("⚔️", `${WEAPONS[wi].name} +${wlv}`, `攻撃力 ${wp} → ${wp + wStep(wi)}`, wcost,
-      canAfford(wcost), false, () => { pay(wcost); player.weaponPlus[wi] = wlv + 1; afterPurchase(); }));
+    const nextFx = (wlv + 1) % 10 === 0 ? "（+" + (wlv + 1) + "で特殊効果！）" : "";
+    el.shop.appendChild(shopRow("⚔️", `${WEAPONS[wi].name} +${wlv}`, `攻撃力 ${wp} → ${wp + wStep(wi)}${nextFx}`, wcost,
+      canAfford(wcost), false, () => {
+        pay(wcost); player.weaponPlus[wi] = wlv + 1;
+        if (player.weaponPlus[wi] % 10 === 0) grantEnhanceFx(wi);
+        afterPurchase();
+      }));
     const ai = player.armor, alv = player.armorPlus[ai] || 0, acost = enhanceCostA(ai), ap = armorDef();
     el.shop.appendChild(shopRow("🛡️", `${ARMOR[ai].name} +${alv}`, `防御力 ${ap} → ${ap + aStep(ai)}`, acost,
       canAfford(acost), false, () => { pay(acost); player.armorPlus[ai] = alv + 1; afterPurchase(); }));
@@ -1303,9 +1339,9 @@
     el.armorIcon.textContent = ARMOR[player.armor].emoji;
     const wlv = player.weaponPlus[player.weapon] || 0;
     const alv = player.armorPlus[player.armor] || 0;
-    const eff = weaponEffect(player.weapon);
+    const fxEmo = weaponFx(player.weapon).map((k) => EFFECTS[k].emoji).join("");
     const aeff = armorEffect(player.armor);
-    el.weaponPlus.textContent = (eff ? EFFECTS[eff].emoji : "") + (wlv ? "+" + wlv : "");
+    el.weaponPlus.textContent = fxEmo + (wlv ? "+" + wlv : "");
     el.armorPlus.textContent = (aeff ? ARMOR_EFFECTS[aeff].emoji : "") + (alv ? "+" + alv : "");
   }
 
