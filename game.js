@@ -104,6 +104,8 @@
     if (depth < 40) return BOSS_WEAPON_BASE + 1; // 覇王の剣
     return BOSS_WEAPON_BASE + 2;                 // 滅びの竜剣
   }
+  // 大ボス（主）：100階につき2回（B30/B70…）。通常ボスより遥かに強く強烈なオーラ
+  const MEGA = [["古龍", "🐉"], ["破壊神", "👹"], ["災厄竜", "🦖"], ["奈落の主", "🐲"], ["巨獣王", "🦏"]];
 
   // ---- お供（なかま）：レベルで成長し、10レベルごとに進化（見た目変化） ----
   // evo: 進化段階[名前,絵文字], atk/heal/buff = Lv1の値, *G = レベルごとの伸び
@@ -394,9 +396,11 @@
       }
       // guarantee at least one non-rock so the floor is always passable
       if (tiles.every((t) => t === "rock")) tiles[(Math.random() * COLS) | 0] = "dirt";
-      // ボスは端寄りの列に配置（中央を通れば回避できる）。B64までは出現を半分に
-      if (r % BOSS_INTERVAL === 0 && (r > 64 || Math.random() < 0.5)) {
-        const edges = [0, 1, COLS - 2, COLS - 1];
+      // ボス／大ボスは端寄りの列に配置（中央を通れば回避できる）
+      const edges = [0, 1, COLS - 2, COLS - 1];
+      if (r % 100 === 30 || r % 100 === 70) {
+        tiles[edges[(Math.random() * edges.length) | 0]] = "megaboss"; // 100階につき2回・必ず出現
+      } else if (r % BOSS_INTERVAL === 0 && (r > 64 || Math.random() < 0.5)) {
         tiles[edges[(Math.random() * edges.length) | 0]] = "boss";
       }
     }
@@ -518,7 +522,7 @@
     }
 
     // base earth
-    if (t === "empty" || t === "camp" || t === "enemy" || t === "gold" || t === "gem" || t === "heart" || t === "boss") {
+    if (t === "empty" || t === "camp" || t === "enemy" || t === "gold" || t === "gem" || t === "heart" || t === "boss" || t === "megaboss") {
       // dug-out / cave background
       ctx.fillStyle = caveColor(r);
       ctx.fillRect(x, y, TS + 1, TS + 1);
@@ -559,35 +563,44 @@
     } else if (t === "enemy") {
       const ed = enemyDataFor(r, c);
       emoji(ed.emoji, cx, cy);
-    } else if (t === "boss") {
-      drawBossAura(cx, cy, tAnim);
-      const bd = bossDataFor(r, c);
-      ctx.font = `${TS * 0.68}px serif`;
+    } else if (t === "boss" || t === "megaboss") {
+      const mega = (t === "megaboss");
+      drawBossAura(cx, cy, tAnim, mega);
+      const bd = mega ? megaDataFor(r, c) : bossDataFor(r, c);
+      ctx.font = `${TS * (mega ? 0.78 : 0.68)}px serif`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(bd.emoji, cx, cy);
     }
   }
 
-  // たなびくオーラ
-  function drawBossAura(cx, cy, t) {
+  // たなびくオーラ（megaで強烈に）
+  function drawBossAura(cx, cy, t, mega) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 3);
-    const R = TS * (0.52 + 0.14 * pulse);
+    const R = TS * ((mega ? 0.72 : 0.52) + (mega ? 0.22 : 0.14) * pulse);
     const g = ctx.createRadialGradient(cx, cy, TS * 0.08, cx, cy, R);
-    g.addColorStop(0, "rgba(255,180,60,0.55)");
-    g.addColorStop(0.55, "rgba(220,60,160,0.30)");
-    g.addColorStop(1, "rgba(220,60,160,0)");
+    if (mega) {
+      g.addColorStop(0, "rgba(255,80,40,0.7)");
+      g.addColorStop(0.4, "rgba(255,200,40,0.5)");
+      g.addColorStop(0.75, "rgba(180,40,220,0.4)");
+      g.addColorStop(1, "rgba(180,40,220,0)");
+    } else {
+      g.addColorStop(0, "rgba(255,180,60,0.55)");
+      g.addColorStop(0.55, "rgba(220,60,160,0.30)");
+      g.addColorStop(1, "rgba(220,60,160,0)");
+    }
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
     // 揺らめく炎のオーラ
-    for (let k = 0; k < 6; k++) {
-      const a = t * 1.6 + k * (Math.PI * 2 / 6);
-      const rad = TS * (0.4 + 0.08 * Math.sin(t * 4 + k));
+    const n = mega ? 10 : 6;
+    for (let k = 0; k < n; k++) {
+      const a = t * (mega ? 2.2 : 1.6) + k * (Math.PI * 2 / n);
+      const rad = TS * ((mega ? 0.56 : 0.4) + 0.1 * Math.sin(t * 4 + k));
       const wx = cx + Math.cos(a) * rad;
       const wy = cy + Math.sin(a) * rad * 0.7;
-      ctx.fillStyle = `rgba(255,${110 + ((k * 30) % 120)},40,0.35)`;
+      ctx.fillStyle = mega ? `rgba(255,${60 + ((k * 25) % 160)},30,0.4)` : `rgba(255,${110 + ((k * 30) % 120)},40,0.35)`;
       ctx.save();
       ctx.translate(wx, wy); ctx.rotate(a);
-      ctx.beginPath(); ctx.ellipse(0, 0, TS * 0.05, TS * 0.13, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, TS * (mega ? 0.06 : 0.05), TS * (mega ? 0.18 : 0.13), 0, 0, 7); ctx.fill();
       ctx.restore();
     }
   }
@@ -607,6 +620,11 @@
       const e = tier.list[(Math.random() * tier.list.length) | 0];
       bossCache[k] = { name: e[0], emoji: e[1] };
     }
+    return bossCache[k];
+  }
+  function megaDataFor(r, c) {
+    const k = r + "," + c;
+    if (!bossCache[k]) { const e = MEGA[(Math.random() * MEGA.length) | 0]; bossCache[k] = { name: e[0], emoji: e[1] }; }
     return bossCache[k];
   }
 
@@ -691,8 +709,9 @@
 
     const t = tileAt(nr, nc);
     if (t === "rock") { bump(); return; }
-    if (t === "enemy") { startCombat(nr, nc, false); return; }
-    if (t === "boss") { startCombat(nr, nc, true); return; }
+    if (t === "enemy") { startCombat(nr, nc, "enemy"); return; }
+    if (t === "boss") { startCombat(nr, nc, "boss"); return; }
+    if (t === "megaboss") { startCombat(nr, nc, "mega"); return; }
     // collectible / dirt / empty
     collect(nr, nc, t);
     doMoveTo(nr, nc);
@@ -785,28 +804,34 @@
   // ============================================================
   //  Combat
   // ============================================================
-  function startCombat(r, c, isBoss) {
+  function startCombat(r, c, kind) {
+    kind = (kind === true) ? "boss" : (kind || "enemy");
+    const isMega = kind === "mega";
+    const isBoss = kind === "boss" || isMega;
     const depth = r;
-    const ed = isBoss ? bossDataFor(r, c) : enemyDataFor(r, c);
-    const baseHp = (6 + depth * 2.4);
-    const hp = Math.round(baseHp * (isBoss ? 3 : 1) * (0.9 + Math.random() * 0.25));
-    const baseAtk = (1.5 + depth * 0.7);
+    const ed = isMega ? megaDataFor(r, c) : isBoss ? bossDataFor(r, c) : enemyDataFor(r, c);
+    const hpMul = isMega ? 8 : isBoss ? 3 : 1;
+    const atkMul = isMega ? 2.4 : isBoss ? 1.6 : 1;
+    const hp = Math.round((6 + depth * 2.4) * hpMul * (0.9 + Math.random() * 0.25));
     combat = {
-      r, c, name: ed.name, emoji: ed.emoji, isBoss: !!isBoss,
+      r, c, name: ed.name, emoji: ed.emoji, isBoss: isBoss, isMega: isMega,
       hp, maxHp: hp,
-      atk: Math.max(1, Math.round(baseAtk * (isBoss ? 1.6 : 1) * (0.9 + Math.random() * 0.25))),
-      reward: isBoss
-        ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
-        : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
+      atk: Math.max(1, Math.round((1.5 + depth * 0.7) * atkMul * (0.9 + Math.random() * 0.25))),
+      reward: isMega
+        ? (1500 + depth * 400 + ((Math.random() * (1000 + depth * 200)) | 0))
+        : isBoss
+          ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
+          : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
       drop: isBoss ? bossWeaponIndex(depth) : -1,
       burn: 0, freeze: 0, guardLeft: guardCapacity(),
       busy: false,
     };
     state = "combat";
     el.enemyEmoji.textContent = ed.emoji;
-    el.enemyEmoji.classList.toggle("boss", !!isBoss);
-    el.enemyName.textContent = (isBoss ? "👑【ボス】" : "") + ed.name + `  (B${depth}F)`;
-    el.combatLog.innerHTML = `<div>${isBoss ? "強大なオーラ…！ " : ""}${ed.name} があらわれた！</div>`;
+    el.enemyEmoji.classList.toggle("boss", isBoss && !isMega);
+    el.enemyEmoji.classList.toggle("mega", isMega);
+    el.enemyName.textContent = (isMega ? "💀【大ボス】" : isBoss ? "👑【ボス】" : "") + ed.name + `  (B${depth}F)`;
+    el.combatLog.innerHTML = `<div>${isMega ? "凄まじい瘴気！ " : isBoss ? "強大なオーラ…！ " : ""}${ed.name} があらわれた！</div>`;
     updateEnemyHp();
     renderCombatPets();
     show(el.ovCombat, true);
@@ -1016,13 +1041,13 @@
     // ボスは専用武器をドロップ（威力はフロアに応じて決定／自動装備はしない）
     if (combat.isBoss && combat.drop >= 0) {
       const di = combat.drop;
-      const pow = bossDropPower(combat.r);
+      const pow = Math.round(bossDropPower(combat.r) * (combat.isMega ? 1.6 : 1)); // 大ボスはより強力
       player.bossPow = player.bossPow || {};
       const upgraded = pow > (player.bossPow[di] || 0);
       player.bossPow[di] = Math.max(player.bossPow[di] || 0, pow);
       player.owned[di] = true; // 装備は変更しない（脱出ポイントで付け替え可）
       logCombat(`<span class="awk">⚔️ ${WEAPONS[di].name}（攻撃${player.bossPow[di]}）</span> を手に入れた！${upgraded ? "" : "（威力は据え置き）"}`);
-      el.enemyEmoji.classList.remove("boss");
+      el.enemyEmoji.classList.remove("boss", "mega");
     }
     // 覚醒「捕獲」：倒した敵を5%でおともに（攻撃力=基本おともの攻撃合計の1/4）
     if (weaponFx(player.weapon).includes("tame") && Math.random() < 0.05 && (player.pets || []).length < 12) {

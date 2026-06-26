@@ -217,6 +217,14 @@ html, body {
   0%, 100% { filter: drop-shadow(0 0 6px rgba(255,170,50,.7)) drop-shadow(0 0 14px rgba(220,60,160,.5)); }
   50% { filter: drop-shadow(0 0 16px rgba(255,170,50,.95)) drop-shadow(0 0 30px rgba(220,60,160,.8)); }
 }
+.enemy-emoji.mega {
+  animation: bob 1.2s ease-in-out infinite, megaAura 1.2s ease-in-out infinite;
+  font-size: 110px;
+}
+@keyframes megaAura {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(255,90,40,.9)) drop-shadow(0 0 22px rgba(255,200,40,.7)) drop-shadow(0 0 34px rgba(180,40,220,.6)); }
+  50% { filter: drop-shadow(0 0 22px rgba(255,90,40,1)) drop-shadow(0 0 44px rgba(255,200,40,.9)) drop-shadow(0 0 64px rgba(180,40,220,.85)); }
+}
 .enemy-emoji.hit { animation: shake .25s; }
 @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-9px)} 75%{transform:translateX(9px)} }
 .enemy-name { font-size: 20px; color: var(--text); }
