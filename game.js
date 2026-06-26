@@ -83,6 +83,15 @@
   };
   const EFFECT_KEYS = Object.keys(EFFECTS);
 
+  // ---- 防具の覚醒効果 ----
+  const ARMOR_EFFECTS = {
+    reflect:  { name: "反射", emoji: "🪞", desc: "受けたダメージの一部を敵に返す" },
+    evade:    { name: "回避", emoji: "💨", desc: "20%の確率でダメージを無効化" },
+    ironwall: { name: "鉄壁", emoji: "🧱", desc: "被ダメージをさらに4割軽減" },
+    blessing: { name: "加護", emoji: "😇", desc: "敵の攻撃のたびHP回復" },
+  };
+  const ARMOR_EFFECT_KEYS = Object.keys(ARMOR_EFFECTS);
+
   // ---- ボス ----
   const BOSS_TIERS = [
     { until: 20, list: [["がんせき魔神", "🪨"], ["マッシュ大王", "🍄"]] },
@@ -160,7 +169,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, comp: [], bossPow: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, comp: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -182,6 +191,7 @@
         weaponPlus: Array.isArray(p.weaponPlus) ? p.weaponPlus : [],
         armorPlus: Array.isArray(p.armorPlus) ? p.armorPlus : [],
         awaken: (p.awaken && typeof p.awaken === "object") ? p.awaken : {},
+        armorAwaken: (p.armorAwaken && typeof p.armorAwaken === "object") ? p.armorAwaken : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
         bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
@@ -206,6 +216,7 @@
     profile.weaponPlus = player.weaponPlus.slice();
     profile.armorPlus = player.armorPlus.slice();
     profile.awaken = Object.assign({}, player.awaken);
+    profile.armorAwaken = Object.assign({}, player.armorAwaken);
     profile.comp = player.comp.slice();
     profile.bossPow = Object.assign({}, player.bossPow);
   }
@@ -230,8 +241,8 @@
              weapon: profile.weapon, owned: owned,
              armor: profile.armor, ownedArmor: ownedArmor,
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
-             awaken: Object.assign({}, profile.awaken), comp: profile.comp.slice(),
-             bossPow: Object.assign({}, profile.bossPow),
+             awaken: Object.assign({}, profile.awaken), armorAwaken: Object.assign({}, profile.armorAwaken),
+             comp: profile.comp.slice(), bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
 
@@ -268,9 +279,20 @@
     return pow;
   }
   function bossDropPower(depth) { return Math.round(affordableWeaponPower(depth) * 1.5); }
+  function armorEffect(i) { return (player.armorAwaken && player.armorAwaken[i]) || null; }
+  function strongestOwnedArmorDef() {
+    let m = 0;
+    for (let i = 0; i < ARMOR.length; i++) if (player.ownedArmor[i]) m = Math.max(m, ARMOR[i].def);
+    return m;
+  }
+  // 覚醒した防具は「所持最強防具の0.8倍」の防御力になる
+  function armorBase(i) {
+    if (armorEffect(i)) return Math.max(ARMOR[i].def, Math.round(0.8 * strongestOwnedArmorDef()));
+    return ARMOR[i].def;
+  }
   function armorDef() {
     const i = player.armor;
-    return ARMOR[i].def + (player.armorPlus[i] || 0) * aStep(i);
+    return armorBase(i) + (player.armorPlus[i] || 0) * aStep(i);
   }
   function enhanceCostW(i) {
     const lv = player.weaponPlus[i] || 0;
@@ -674,19 +696,25 @@
     }
   }
 
-  // 購入済みで「最も高価な武器より安い」武器のひとつを覚醒させる
+  // 武器と防具を同時に覚醒させる（「最も高価な所持品より安いもの」のひとつ）
   let pendingAwaken = null;
   function tryAwaken() {
+    const w = awakenOne(WEAPONS, player.owned, player.awaken, EFFECT_KEYS);
+    const a = awakenOne(ARMOR, player.ownedArmor, player.armorAwaken, ARMOR_EFFECT_KEYS);
+    if (!w && !a) return null;
+    return { weapon: w, armor: a };
+  }
+  function awakenOne(list, owned, awakenMap, effectKeys) {
     let maxCost = -1;
-    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i] && !WEAPONS[i].boss) maxCost = Math.max(maxCost, WEAPONS[i].cost);
+    for (let i = 0; i < list.length; i++) if (owned[i] && !list[i].boss) maxCost = Math.max(maxCost, list[i].cost);
     const eligible = [];
-    for (let i = 0; i < WEAPONS.length; i++) if (player.owned[i] && !WEAPONS[i].boss && WEAPONS[i].cost < maxCost) eligible.push(i);
+    for (let i = 0; i < list.length; i++) if (owned[i] && !list[i].boss && list[i].cost < maxCost) eligible.push(i);
     if (eligible.length === 0) return null;
-    const fresh = eligible.filter((i) => !weaponEffect(i));
+    const fresh = eligible.filter((i) => !awakenMap[i]);
     const pool = fresh.length ? fresh : eligible;
     const idx = pool[(Math.random() * pool.length) | 0];
-    const effect = EFFECT_KEYS[(Math.random() * EFFECT_KEYS.length) | 0];
-    player.awaken[idx] = effect;
+    const effect = effectKeys[(Math.random() * effectKeys.length) | 0];
+    awakenMap[idx] = effect;
     return { idx, effect };
   }
 
@@ -830,18 +858,40 @@
       done && done();
       return;
     }
+    const aeff = armorEffect(player.armor);
     const raw = Math.max(1, Math.round(combat.atk * (0.8 + Math.random() * 0.4)));
     const def = armorDef();
-    const dmg = Math.max(1, raw - def);
+    let dmg = Math.max(1, raw - def);
+    let evaded = false;
+    if (aeff === "evade" && Math.random() < 0.2) { dmg = 0; evaded = true; }
+    else if (aeff === "ironwall") { dmg = Math.max(1, Math.round(dmg * 0.6)); }
     player.hp -= dmg;
     shakeT = 0.6;
-    const reduced = def > 0 && raw > dmg ? `（${ARMOR[player.armor].name}で-${raw - dmg}）` : "";
-    logCombat(`${combat.name} の こうげき！ <span class="hurt">${dmg}</span> ダメージ${reduced}`);
+    if (evaded) {
+      logCombat(`${combat.name} の こうげき！ <span class="awk">💨 回避！</span>`);
+    } else {
+      const reduced = def > 0 && raw > dmg ? `（${ARMOR[player.armor].name}で-${raw - dmg}）` : "";
+      logCombat(`${combat.name} の こうげき！ <span class="hurt">${dmg}</span> ダメージ${reduced}`);
+    }
     updateHUD();
     sfx("hurt");
     if (player.hp <= 0) {
       player.hp = 0; updateHUD();
       if (!tryGuard() && !tryRevive()) { setTimeout(gameOver, 500); return; }
+    }
+    // 防具「加護」：敵の攻撃のたびHP回復
+    if (aeff === "blessing" && player.hp > 0 && player.hp < player.maxHp) {
+      const h = Math.max(2, Math.round(player.maxHp * 0.05));
+      player.hp = Math.min(player.maxHp, player.hp + h);
+      logCombat(`<span class="awk">😇 加護</span> HP+${h}`); updateHUD();
+    }
+    // 防具「反射」：受けたダメージの一部を敵に返す
+    if (aeff === "reflect" && dmg > 0 && combat.hp > 0) {
+      const rf = Math.max(1, Math.round(dmg * 0.3));
+      combat.hp -= rf;
+      logCombat(`<span class="awk">🪞 反射</span> ${combat.name} に <span class="dmg">${rf}</span>`);
+      updateEnemyHp();
+      if (combat.hp <= 0) { setTimeout(() => winCombat(), 450); return; }
     }
     // 火傷：敵の攻撃後にダメージ
     if (combat.burn > 0) {
@@ -949,9 +999,11 @@
     state = "camp";
     el.campSub.textContent = `B${player.r}F の脱出ポイント。預けて確保、引き出して装備購入。`;
     if (pendingAwaken) {
-      const a = pendingAwaken; pendingAwaken = null;
-      const ef = EFFECTS[a.effect];
-      el.awakenNotice.innerHTML = `⭐ <b>${WEAPONS[a.idx].name}</b> が覚醒した！ 効果: ${ef.emoji}${ef.name}（${ef.desc}）`;
+      const p = pendingAwaken; pendingAwaken = null;
+      const lines = [];
+      if (p.weapon) { const ef = EFFECTS[p.weapon.effect]; lines.push(`⭐ <b>${WEAPONS[p.weapon.idx].name}</b> 覚醒！ ${ef.emoji}${ef.name}（${ef.desc}）`); }
+      if (p.armor) { const ef = ARMOR_EFFECTS[p.armor.effect]; lines.push(`⭐ <b>${ARMOR[p.armor.idx].name}</b> 覚醒！ ${ef.emoji}${ef.name}（${ef.desc}）`); }
+      el.awakenNotice.innerHTML = lines.join("<br>");
       show(el.awakenNotice, true);
     } else {
       show(el.awakenNotice, false);
@@ -1094,7 +1146,12 @@
       (i) => player.ownedArmor[i], () => player.armor,
       (i) => { player.ownedArmor[i] = true; player.armor = i; },
       (i) => { player.armor = i; },
-      (a) => `防御力 ${a.def}`);
+      (a, i) => {
+        const eff = armorEffect(i);
+        if (eff) return `⭐防御力 ${armorBase(i)}・${ARMOR_EFFECTS[eff].emoji}${ARMOR_EFFECTS[eff].name}`;
+        return `防御力 ${a.def}`;
+      },
+      (i, owned) => i !== 0 || (owned && !!armorEffect(0))); // 覚醒したはだ着は装備可能に
 
     // --- enhancement (無限の金の使い道) ---
     el.shop.appendChild(shopHeader("🔨 強化（装備中のものを+強化）"));
@@ -1247,8 +1304,9 @@
     const wlv = player.weaponPlus[player.weapon] || 0;
     const alv = player.armorPlus[player.armor] || 0;
     const eff = weaponEffect(player.weapon);
+    const aeff = armorEffect(player.armor);
     el.weaponPlus.textContent = (eff ? EFFECTS[eff].emoji : "") + (wlv ? "+" + wlv : "");
-    el.armorPlus.textContent = alv ? "+" + alv : "";
+    el.armorPlus.textContent = (aeff ? ARMOR_EFFECTS[aeff].emoji : "") + (alv ? "+" + alv : "");
   }
 
   // ============================================================
