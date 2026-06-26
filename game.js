@@ -135,7 +135,7 @@
     if (atk) parts.push(`攻撃+${atk}`);
     if (heal) parts.push(`回復+${heal}`);
     if (buff) parts.push(`攻撃力+${Math.round(buff * 100)}%`);
-    if (c.guard) parts.push("戦闘1回みがわり");
+    if (c.guard) { const cnt = [3, 5, 8][Math.min(c.evo.length - 1, Math.floor(L / 10))] || 3; parts.push(`戦闘${cnt}回みがわり`); }
     return parts.join("・");
   }
 
@@ -791,7 +791,7 @@
         ? (300 + depth * 80 + ((Math.random() * (200 + depth * 40)) | 0))
         : (30 + depth * 12 + ((Math.random() * (20 + depth * 5)) | 0)),
       drop: isBoss ? bossWeaponIndex(depth) : -1,
-      burn: 0, freeze: 0, guardUsed: false,
+      burn: 0, freeze: 0, guardLeft: guardCapacity(),
       busy: false,
     };
     state = "combat";
@@ -893,9 +893,13 @@
     for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) b += compBuffVal(i);
     return b;
   }
-  function hasGuard() {
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i] && COMPANIONS[i].guard) return true;
-    return false;
+  // みがわり回数：進化段階で 3→5→8
+  function guardCapacity() {
+    let cap = 0;
+    for (let i = 0; i < COMPANIONS.length; i++) {
+      if (player.comp[i] && COMPANIONS[i].guard) cap = Math.max(cap, [3, 5, 8][compStage(i)] || 3);
+    }
+    return cap;
   }
   function renderCombatPets() {
     const emos = [];
@@ -973,13 +977,13 @@
     return true;
   }
 
-  // お供「まもりぐま」：戦闘ごとに1回みがわり
+  // お供「まもりぐま」：1戦闘あたり複数回みがわり（進化で 3→5→8回）
   function tryGuard() {
-    if (!hasGuard() || combat.guardUsed) return false;
-    combat.guardUsed = true;
+    if (!combat.guardLeft || combat.guardLeft <= 0) return false;
+    combat.guardLeft--;
     player.hp = Math.max(1, Math.round(player.maxHp * 0.3));
     updateHUD();
-    logCombat(`<span class="awk">🐻 まもりぐま</span> がみがわりになった！`);
+    logCombat(`<span class="awk">🛡️ みがわり！</span>（のこり${combat.guardLeft}回）`);
     sfx("heal");
     return true;
   }
