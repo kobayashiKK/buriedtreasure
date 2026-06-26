@@ -80,6 +80,7 @@
     burn:      { name: "火傷", emoji: "🔥", desc: "敵の攻撃後にダメージを与え続ける" },
     freeze:    { name: "凍結", emoji: "❄️", desc: "一定確率で敵を数ターン凍結させる" },
     revive:    { name: "生命の神秘", emoji: "💚", desc: "力尽きても一度だけ復活する" },
+    tame:      { name: "捕獲", emoji: "🪤", desc: "倒した敵を5%でおともにする" },
   };
   const EFFECT_KEYS = Object.keys(EFFECTS);
 
@@ -193,7 +194,7 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], compLv: [], bossPow: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], compLv: [], pets: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -219,6 +220,7 @@
         efx: (p.efx && typeof p.efx === "object") ? p.efx : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
         compLv: Array.isArray(p.compLv) ? p.compLv : [],
+        pets: Array.isArray(p.pets) ? p.pets : [],
         bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
     } catch (_) { return defaultProfile(); }
@@ -246,6 +248,7 @@
     profile.efx = JSON.parse(JSON.stringify(player.efx || {}));
     profile.comp = player.comp.slice();
     profile.compLv = player.compLv.slice();
+    profile.pets = JSON.parse(JSON.stringify(player.pets || []));
     profile.bossPow = Object.assign({}, player.bossPow);
   }
   // 死亡時：持ち越し装備をリセット（図鑑・貯金は残す）
@@ -271,7 +274,8 @@
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), armorAwaken: Object.assign({}, profile.armorAwaken),
              efx: JSON.parse(JSON.stringify(profile.efx || {})),
-             comp: profile.comp.slice(), compLv: profile.compLv.slice(), bossPow: Object.assign({}, profile.bossPow),
+             comp: profile.comp.slice(), compLv: profile.compLv.slice(),
+             pets: JSON.parse(JSON.stringify(profile.pets || [])), bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
 
@@ -875,12 +879,19 @@
     setTimeout(() => enemyAttack(() => { combat.busy = false; setCombatButtons(true); }), 480);
   }
 
+  // 基本のおとも（捕獲した敵は除く）の攻撃力合計
+  function baseCompanionAtkSum() {
+    let s = 0;
+    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) s += compAtk(i);
+    return s;
+  }
   function companionDamage() {
     let total = 0;
     for (let i = 0; i < COMPANIONS.length; i++) {
       const a = compAtk(i);
       if (player.comp[i] && a) total += Math.max(1, Math.round(a * (0.8 + Math.random() * 0.4)));
     }
+    if (player.pets) for (const p of player.pets) if (p.atk) total += Math.max(1, Math.round(p.atk * (0.8 + Math.random() * 0.4)));
     return total;
   }
   function companionHeal() {
@@ -904,6 +915,7 @@
   function renderCombatPets() {
     const emos = [];
     for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) emos.push(compForm(i)[1]);
+    if (player.pets) for (const p of player.pets) emos.push(p.emoji);
     if (emos.length) {
       el.combatPets.innerHTML = "なかま " + emos.join("");
       show(el.combatPets, true);
@@ -1007,6 +1019,13 @@
       player.owned[di] = true; // 装備は変更しない（脱出ポイントで付け替え可）
       logCombat(`<span class="awk">⚔️ ${WEAPONS[di].name}（攻撃${player.bossPow[di]}）</span> を手に入れた！${upgraded ? "" : "（威力は据え置き）"}`);
       el.enemyEmoji.classList.remove("boss");
+    }
+    // 覚醒「捕獲」：倒した敵を5%でおともに（攻撃力=基本おともの攻撃合計の1/4）
+    if (weaponFx(player.weapon).includes("tame") && Math.random() < 0.05 && (player.pets || []).length < 12) {
+      const atk = Math.floor(baseCompanionAtkSum() / 4);
+      player.pets = player.pets || [];
+      player.pets.push({ name: combat.name, emoji: combat.emoji, atk: atk });
+      logCombat(`<span class="awk">🪤 捕獲！</span> ${combat.name} がなかまになった！（攻撃${atk}）`);
     }
     addFloater(combat.r, combat.c, "+" + reward + "G", "#f6c453");
     setTile(combat.r, combat.c, "empty");
