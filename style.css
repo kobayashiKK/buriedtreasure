@@ -290,6 +290,9 @@ html, body {
 .shop-item .si-buy:disabled { background: #3a2818; color: #6b5a42; border-color: #4a3422; }
 .shop-item.owned { opacity: .55; }
 .shop-item .si-buy.equipped { background: #4a6b3a; color: #d8f0c8; border-color: #3a5a2a; }
+.comp-toggle { flex: 0 0 auto; padding: 8px 10px; font-size: 12px; border-width: 2px; white-space: nowrap; }
+.comp-toggle.on { background: linear-gradient(#5fbf6f, #3a8f4a); color: #06280f; border-color: #2a6a32; }
+.comp-toggle.off { background: var(--panel); color: var(--muted); border-color: var(--border); }
 /* Bank / 送金 */
 .bank {
   width: 100%;

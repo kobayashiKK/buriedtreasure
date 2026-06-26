@@ -122,6 +122,7 @@
       atk: 45, atkG: 12, heal: 3, healG: 1, buff: 0, buffG: 0, guard: false },
   ];
   function compLevel(i) { return (player.compLv && player.compLv[i]) || (player.comp[i] ? 1 : 0); }
+  function compActive(i) { return !!player.comp[i] && !(player.compOff && player.compOff[i]); } // 戦闘に出すか
   function compStage(i) { return Math.min(COMPANIONS[i].evo.length - 1, Math.floor(compLevel(i) / 10)); }
   function compForm(i) { return COMPANIONS[i].evo[compStage(i)]; }
   function compAtk(i) { const L = compLevel(i); return L ? COMPANIONS[i].atk + (L - 1) * COMPANIONS[i].atkG : 0; }
@@ -136,7 +137,7 @@
     if (atk) parts.push(`攻撃+${atk}`);
     if (heal) parts.push(`回復+${heal}`);
     if (buff) parts.push(`攻撃力+${Math.round(buff * 100)}%`);
-    if (c.guard) { const cnt = [3, 5, 8][Math.min(c.evo.length - 1, Math.floor(L / 10))] || 3; parts.push(`戦闘${cnt}回みがわり`); }
+    if (c.guard) { const cnt = [2, 4, 7][Math.min(c.evo.length - 1, Math.floor(L / 10))] || 2; parts.push(`戦闘${cnt}回みがわり`); }
     return parts.join("・");
   }
 
@@ -194,7 +195,8 @@
   // お金(貯金)は常に持ち越し。装備は「脱出（クリア）」したときだけ持ち越す。図鑑は常に蓄積。
   function baseGear() {
     return { weapon: 0, owned: [true], armor: 0, ownedArmor: [true], maxHp: 30,
-             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {}, comp: [], compLv: [], pets: [], bossPow: {} };
+             weaponPlus: [], armorPlus: [], awaken: {}, armorAwaken: {}, efx: {},
+             comp: [], compLv: [], compOff: [], pets: [], bossPow: {} };
   }
   function defaultProfile() {
     return Object.assign({ bank: 0, deepest: 0, dex: [] }, baseGear());
@@ -220,6 +222,7 @@
         efx: (p.efx && typeof p.efx === "object") ? p.efx : {},
         comp: Array.isArray(p.comp) ? p.comp : [],
         compLv: Array.isArray(p.compLv) ? p.compLv : [],
+        compOff: Array.isArray(p.compOff) ? p.compOff : [],
         pets: Array.isArray(p.pets) ? p.pets : [],
         bossPow: (p.bossPow && typeof p.bossPow === "object") ? p.bossPow : {},
       };
@@ -248,6 +251,7 @@
     profile.efx = JSON.parse(JSON.stringify(player.efx || {}));
     profile.comp = player.comp.slice();
     profile.compLv = player.compLv.slice();
+    profile.compOff = player.compOff.slice();
     profile.pets = JSON.parse(JSON.stringify(player.pets || []));
     profile.bossPow = Object.assign({}, player.bossPow);
   }
@@ -274,7 +278,7 @@
              weaponPlus: profile.weaponPlus.slice(), armorPlus: profile.armorPlus.slice(),
              awaken: Object.assign({}, profile.awaken), armorAwaken: Object.assign({}, profile.armorAwaken),
              efx: JSON.parse(JSON.stringify(profile.efx || {})),
-             comp: profile.comp.slice(), compLv: profile.compLv.slice(),
+             comp: profile.comp.slice(), compLv: profile.compLv.slice(), compOff: profile.compOff.slice(),
              pets: JSON.parse(JSON.stringify(profile.pets || [])), bossPow: Object.assign({}, profile.bossPow),
              reviveUsed: {}, campCount: 0, depthMax: 0 };
   }
@@ -879,42 +883,42 @@
     setTimeout(() => enemyAttack(() => { combat.busy = false; setCombatButtons(true); }), 480);
   }
 
-  // 基本のおとも（捕獲した敵は除く）の攻撃力合計
+  // 基本のおとも（捕獲した敵は除く・出撃中のみ）の攻撃力合計
   function baseCompanionAtkSum() {
     let s = 0;
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) s += compAtk(i);
+    for (let i = 0; i < COMPANIONS.length; i++) if (compActive(i)) s += compAtk(i);
     return s;
   }
   function companionDamage() {
     let total = 0;
     for (let i = 0; i < COMPANIONS.length; i++) {
       const a = compAtk(i);
-      if (player.comp[i] && a) total += Math.max(1, Math.round(a * (0.8 + Math.random() * 0.4)));
+      if (compActive(i) && a) total += Math.max(1, Math.round(a * (0.8 + Math.random() * 0.4)));
     }
     if (player.pets) for (const p of player.pets) if (p.atk) total += Math.max(1, Math.round(p.atk * (0.8 + Math.random() * 0.4)));
     return total;
   }
   function companionHeal() {
     let h = 0;
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) h += compHealVal(i);
+    for (let i = 0; i < COMPANIONS.length; i++) if (compActive(i)) h += compHealVal(i);
     return h;
   }
   function companionBuff() {
     let b = 0;
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) b += compBuffVal(i);
+    for (let i = 0; i < COMPANIONS.length; i++) if (compActive(i)) b += compBuffVal(i);
     return b;
   }
-  // みがわり回数：進化段階で 3→5→8
+  // みがわり回数：進化段階で 2→4→7
   function guardCapacity() {
     let cap = 0;
     for (let i = 0; i < COMPANIONS.length; i++) {
-      if (player.comp[i] && COMPANIONS[i].guard) cap = Math.max(cap, [3, 5, 8][compStage(i)] || 3);
+      if (compActive(i) && COMPANIONS[i].guard) cap = Math.max(cap, [2, 4, 7][compStage(i)] || 2);
     }
     return cap;
   }
   function renderCombatPets() {
     const emos = [];
-    for (let i = 0; i < COMPANIONS.length; i++) if (player.comp[i]) emos.push(compForm(i)[1]);
+    for (let i = 0; i < COMPANIONS.length; i++) if (compActive(i)) emos.push(compForm(i)[1]);
     if (player.pets) for (const p of player.pets) emos.push(p.emoji);
     if (emos.length) {
       el.combatPets.innerHTML = "なかま " + emos.join("");
@@ -1277,6 +1281,13 @@
             afterPurchase();
           });
         row.querySelector(".si-buy").textContent = "強化 " + up + "G";
+        // 出撃ON/OFFトグル
+        const active = compActive(i);
+        const tog = document.createElement("button");
+        tog.className = "btn comp-toggle " + (active ? "on" : "off");
+        tog.textContent = active ? "出撃中" : "ひかえ";
+        tog.onclick = () => { player.compOff = player.compOff || []; player.compOff[i] = active; afterPurchase(); };
+        row.insertBefore(tog, row.querySelector(".si-buy"));
         el.shop.appendChild(row);
       }
     });
@@ -1562,6 +1573,7 @@
     if (!Array.isArray(player.armorPlus)) player.armorPlus = [];
     if (!Array.isArray(player.comp)) player.comp = [];
     if (!Array.isArray(player.compLv)) player.compLv = [];
+    if (!Array.isArray(player.compOff)) player.compOff = [];
     if (!Array.isArray(player.pets)) player.pets = [];
     if (!player.awaken) player.awaken = {};
     if (!player.armorAwaken) player.armorAwaken = {};
