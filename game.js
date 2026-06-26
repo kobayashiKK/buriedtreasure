@@ -830,11 +830,13 @@
     const ed = isMega ? megaDataFor(r, c) : isBoss ? bossDataFor(r, c) : enemyDataFor(r, c);
     const hpMul = isMega ? 8 : isBoss ? 3 : 1;
     const atkMul = isMega ? 2.4 : isBoss ? 1.6 : 1;
-    const hp = Math.round((6 + depth * 2.4) * hpMul * (0.9 + Math.random() * 0.25));
+    // 魔境(B200+)は深くなるほど強くなるペースを加速
+    const mz = depth >= BIOME_START ? (1 + (depth - BIOME_START) * 0.015) : 1;
+    const hp = Math.round((6 + depth * 2.4) * mz * hpMul * (0.9 + Math.random() * 0.25));
     combat = {
       r, c, name: ed.name, emoji: ed.emoji, isBoss: isBoss, isMega: isMega,
       hp, maxHp: hp,
-      atk: Math.max(1, Math.round((1.5 + depth * 0.7) * atkMul * (0.9 + Math.random() * 0.25))),
+      atk: Math.max(1, Math.round((1.5 + depth * 0.7) * mz * atkMul * (0.9 + Math.random() * 0.25))),
       reward: isMega
         ? (1500 + depth * 400 + ((Math.random() * (1000 + depth * 200)) | 0))
         : isBoss
