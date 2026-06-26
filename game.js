@@ -795,9 +795,11 @@
     const fresh = eligible.filter((i) => !awakenMap[i]);
     const pool = fresh.length ? fresh : eligible;
     const idx = pool[(Math.random() * pool.length) | 0];
-    const effect = effectKeys[(Math.random() * effectKeys.length) | 0];
+    // すでに覚醒済みなら効果は変えず維持（攻撃力は0.8×最強で常に最新）
+    const renewed = !!awakenMap[idx];
+    const effect = renewed ? awakenMap[idx] : effectKeys[(Math.random() * effectKeys.length) | 0];
     awakenMap[idx] = effect;
-    return { idx, effect };
+    return { idx, effect, renewed };
   }
 
   // 強化10回ごと：武器に未所持の特殊効果をひとつ付与
@@ -1131,8 +1133,8 @@
     if (pendingAwaken) {
       const p = pendingAwaken; pendingAwaken = null;
       const lines = [];
-      if (p.weapon) { const ef = EFFECTS[p.weapon.effect]; lines.push(`⭐ <b>${WEAPONS[p.weapon.idx].name}</b> 覚醒！ ${ef.emoji}${ef.name}（${ef.desc}）`); }
-      if (p.armor) { const ef = ARMOR_EFFECTS[p.armor.effect]; lines.push(`⭐ <b>${ARMOR[p.armor.idx].name}</b> 覚醒！ ${ef.emoji}${ef.name}（${ef.desc}）`); }
+      if (p.weapon) { const w = p.weapon, ef = EFFECTS[w.effect]; lines.push(`⭐ <b>${WEAPONS[w.idx].name}</b> ${w.renewed ? "再覚醒（攻撃力更新）" : "覚醒！"} ${ef.emoji}${ef.name}`); }
+      if (p.armor) { const a = p.armor, ef = ARMOR_EFFECTS[a.effect]; lines.push(`⭐ <b>${ARMOR[a.idx].name}</b> ${a.renewed ? "再覚醒（防御力更新）" : "覚醒！"} ${ef.emoji}${ef.name}`); }
       el.awakenNotice.innerHTML = lines.join("<br>");
       show(el.awakenNotice, true);
     } else {
