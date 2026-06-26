@@ -1078,7 +1078,7 @@
     const root = $(id);
     const fill = root.querySelector(".slider-fill");
     const thumb = root.querySelector(".slider-thumb");
-    let max = 0, val = 0, dragging = false;
+    let max = 0, val = 0, dragging = false, decided = false, sx = 0, sy = 0;
     function update() {
       const p = max > 0 ? val / max : 0;
       fill.style.width = (p * 100) + "%";
@@ -1095,19 +1095,25 @@
     }
     root.addEventListener("pointerdown", (e) => {
       if (max <= 0) return;
-      dragging = true;
-      try { root.setPointerCapture(e.pointerId); } catch (_) {}
-      setFromX(e.clientX);
-      e.preventDefault();
+      dragging = false; decided = false; sx = e.clientX; sy = e.clientY;
     });
     root.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      setFromX(e.clientX);
-      e.preventDefault();
+      if (max <= 0) return;
+      if (!decided) {
+        const dx = Math.abs(e.clientX - sx), dy = Math.abs(e.clientY - sy);
+        if (dx < 6 && dy < 6) return;
+        decided = true;
+        if (dx >= dy) { dragging = true; try { root.setPointerCapture(e.pointerId); } catch (_) {} }
+        else return; // 縦方向 → スクロールに任せる
+      }
+      if (dragging) { setFromX(e.clientX); e.preventDefault(); }
     });
-    const end = () => { dragging = false; };
+    const end = (e) => {
+      if (!decided && max > 0) setFromX(e.clientX); // タップでその位置へ
+      dragging = false; decided = false;
+    };
     root.addEventListener("pointerup", end);
-    root.addEventListener("pointercancel", end);
+    root.addEventListener("pointercancel", () => { dragging = false; decided = false; });
     return {
       setMax(m) { max = Math.max(0, m | 0); if (val > max) val = max; update(); },
       setVal(v) { val = Math.max(0, Math.min(max, v | 0)); update(); },

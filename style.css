@@ -313,7 +313,7 @@ html, body {
   flex: 1 1 auto;
   min-width: 0;
   height: 30px;
-  touch-action: none; /* ドラッグをスライダーが受け取る */
+  touch-action: pan-y; /* 縦スワイプはスクロール、横ドラッグでツマミ操作 */
   cursor: pointer;
 }
 .slider-track {

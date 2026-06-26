@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css?v=20260624y" />
+<link rel="stylesheet" href="style.css?v=20260624z" />
 </head>
 <body>
   <div id="app">
@@ -30,7 +30,7 @@
       <canvas id="game"></canvas>
 
       <!-- Title overlay -->
-      <div class="overlay" id="ov-title">
+      <div class="overlay overlay-panel scroll-area" id="ov-title">
         <h1 class="title">埋蔵金<br><span class="title-accent">ディガー</span></h1>
         <p class="subtitle">地の底へ。財宝とともに生きて還れ。</p>
         <div class="best-score">🏦 貯金 <span id="best-title">0</span> G ・ 最高到達 <span id="deepest-title">B0F</span></div>
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Result overlay -->
-      <div class="overlay" id="ov-result" hidden>
+      <div class="overlay overlay-panel scroll-area" id="ov-result" hidden>
         <h1 class="result-title" id="result-title">GAME OVER</h1>
         <div class="result-emoji" id="result-emoji">💀</div>
         <div class="rs-newtitle" id="rs-newtitle" hidden>🎖️ 称号獲得「<span id="rs-newtitle-name"></span>」</div>
@@ -133,6 +133,6 @@
     </footer>
   </div>
 
-  <script src="game.js?v=20260624y"></script>
+  <script src="game.js?v=20260624z"></script>
 </body>
 </html>
